@@ -11,11 +11,11 @@ Protocol for SpiNNaker <-> PushBot
     
 - PushBot -> SpiNNaker
     - Retina event causes multicast packet
-        id: 16
+        id: 30
         key: key | id<<6
         payload: xxxxxxxx xxxxxxxx syyyyyyy yyyyyyyy
     - Greyscale
-        id: 17
+        id: 29
         key: key | id<<6
         payload: xxxxxxxx xxxxyyyy yyyyyyyy vvvvvvvv
     - Other sensors
@@ -41,8 +41,8 @@ Protocol for SpiNNaker <-> PushBot
             IMU_DATA        11          13
             PWM_SIGNALS     12          2
             MOTOR_CURRENTS  13          2
-            WHEEL_ENCODER   14          2    
-            WHEEL_COUNTER   15          2
+            WHEEL_ENCODER   22          2    
+            WHEEL_COUNTER   23          2
             
             To convert from a float value to S1615, do this:            
                (int)(value * 2**15)
@@ -56,7 +56,7 @@ Protocol for SpiNNaker <-> PushBot
                  (maximum value is 180000)
           packet 1:
             key = key | 10<<6 | 0
-            value = 0b00000000 00000000 10000000 00000000
+            value = 0b00000000 00000000 01000000 00000000
           packet 2:
             key = key | 10<<6 | 0b000001 
             value = 0b11111111 11111111 11100000 00000000
@@ -83,22 +83,22 @@ Protocol for SpiNNaker <-> PushBot
         Digital out    id: 8   dimensions: 6
         Raw PWM        id: 9   dimensions: 6
         
-    - Special configuration packet    
-        Config         id: 31  dimensions: 2 (flags, freq)
-          for flags (dimension 0), payload is a bitfield of which data to stream
-          in the same format as the !S command
-             - so receiving a packet with (key & 0x3FF)==(0x3C) would send
-                !S-,65535               # turn off all streaming
-                !S+,<payload>           # turn on the requested streams
-          for freq (dimension 1), payload is the period in milliseconds
-                !S+,0,<payload>
-                
-          Note that the ids listed here are in the same order as the bit
-          flags in the robot spec at 
-              https://wiki.lsr.ei.tum.de/nst/documentation/edvs-4337      
-          with the exception of id 14 and id 15, and using !E+ and !E-
-          for the camera streaming, which we send as bit 16.
+    - Special streaming configuration packet    
+        Config streams id: 31  dimensions: 2 (camera, sensors)
+          for dimension 0, this controls the !S streaming
+            payload: pppppppp ffffffff ffffffff ffffffff
+                where p is the period in milliseconds and f are 24 flags
+            This is converted directly into a !S+,f,p streaming command
+            
+              Note that the ids listed here are in the same order as the bit
+              flags in the robot spec at 
+                  https://wiki.lsr.ei.tum.de/nst/documentation/edvs-4337      
+              with the exception of id 14 and id 15
         
+          for dimension 1, this just controls !E+ or !E-
+            if payload is 0, this is !E-
+            if payload is 1, this is !E+
+            
         
 - UDP in/out is handled via standard SpiNNaker IPTags
 
@@ -106,6 +106,52 @@ Protocol for SpiNNaker <-> PushBot
         
                                                             
                                                             
+Examples:
+  SpiNNaker -> PushBot
+  
+    Set right motor output to 50:
+        key = ******** ******** *****000 01000001   (id=1, dim=1)
+        payload = 00000000 00000000 01000000 00000000
+            (value = (payload*100)>>15 = 50)
+        command: "!M1=50"
+        
+    Turn on camera streaming:
+        key = ******** ******** *****111 11000001   (id=31, dim=1)    
+        payload = 00000000 00000000 00000000 00000001
+        command = "!E+"
+        
+    Turn off camera streaming:
+        key = ******** ******** *****111 11000001   (id=31, dim=1)    
+        payload = 00000000 00000000 00000000 00000000
+        command = "!E-"
+        
+    Turn on gyro and battery streaming every 10ms:
+        key = ******** ******** *****111 11000000   (id=31, dim=0)    
+        payload = 0000000A 00000000 00000100 10000000
+        command = "!S-,65535,10\n!S+,2304,10"
+        
+        
+  PushBot -> SpiNNaker
+    On spike at x=3, y=7:
+        streaming data: 00000011 00000111
+        key = 11111110 11111111 11111111 10000000
+        payload = 00000000 00000011 00000000 00000111
+        
+    Off spike at x=31, y=15:
+        streaming data: 00011111 10001111
+        key = 11111110 11111111 11111111 10000000
+        payload = 00000000 00011111 10000000 00001111
+        
+    Compass 2nd value of 45000:
+        streaming data: "+045000"        
+        key = 11111110 11111111 11111010 10000010    (id=10, dim=2)
+        payload = 00000000 00000000 00100000 00000000 
+        
+        
+        
+        
+        
+        
         
         
        
