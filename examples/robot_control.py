@@ -1,20 +1,20 @@
 import nengo
 
-import nengo_pushbot as pushbot
+import nengo_pushbot
 import numpy as np
-
-bot = pushbot.PushBot('10.162.177.45')
 
 model = nengo.Network()
 with model:
-    input = nengo.Node(lambda t: [0.5*np.sin(t), 0.5*np.cos(t)])
+    input = nengo.Node(lambda t: [0.5*np.sin(10*t), 0.5*np.cos(10*t)])
     a = nengo.Ensemble(nengo.LIF(100), dimensions=2)
-    motor = pushbot.Tracks(bot)
+
+    bot = nengo_pushbot.PushBotNetwork('10.162.177.45')
+
     nengo.Connection(input, a, filter=None)
-    nengo.Connection(a, motor, filter=0.01)
+    nengo.Connection(a, bot.tracks, filter=0.01)
 
 sim_normal = nengo.Simulator(model)
-sim_normal.run(100)
+sim_normal.run(5)
 
 #import nengo_spinnaker
 #sim = nengo_spinnaker.Simulator(model)
