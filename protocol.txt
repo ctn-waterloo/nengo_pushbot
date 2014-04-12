@@ -3,48 +3,65 @@ Protocol for SpiNNaker <-> PushBot
 - PushBot has a key stem (indicating virtual x,y,p location in SpiNNaker network)
     - default: FE FF F8 00 (bottom 11 bits must be zero)
     - settable somehow (perhaps by adjusting firmware? or via UDP command?)
-    - each type of sensor/motor gets an identifier (with overlap between
-       sensors and motors)
-    - each (non-retina) sensor fires values either at a regular rate or on change
-        - can't send all the packets at once, so if they go at a regular rate
-           (e.g. every 10ms) then stagger the packets over that 10ms
+    - each type of sensor/motor gets an identifier
+    - each (non-retina) sensor fires values at a regular rate
+        - would be best to stagger the packets over that period, rather than as a
+          burst of data (although the serial communication might do this for us 
+          for free)
     
 - PushBot -> SpiNNaker
     - Retina event causes multicast packet
-        id: 0b10000
+        id: 16
         key: key | id<<6
         payload: xxxxxxxx xxxxxxxx syyyyyyy yyyyyyyy
     - Greyscale
-        id: 0b10001     
+        id: 17
         key: key | id<<6
         payload: xxxxxxxx xxxxyyyy yyyyyyyy vvvvvvvv
     - Other sensors
-        One packet sent per dimension of the sensor
+        One packet sent per dimension of the sensor (dimension is # of values)
         payload: 32-bit value in S1615 format where the 
                  expected sensor range is -1 to 1
         dimension: 6-bit value
+        id: as per table below
         key: key | id<<6 | dim
         
-        id for sensors
-            Compass         0b00000
-            Gyro            0b00001
-            Accel           0b00010
-            IMU_quaternion  0b00011
-            Power_draw      0b00100
-            Battery_volt    0b00101
-            Wheel_counter   0b00110 (32-bit int as payload)
-            Wheel_encoder   0b00111
-            Analog          0b01000
-        
-        example: Compass data of (0.5, -0.25, 0.75) creates 3 packets
+            Sensor name     id          dims (# of values)
+            BATTERY         0           1
+            ADC_CHANNEL0    1           1
+            ADC_CHANNEL1    2           1
+            ADC_CHANNEL2    3           1
+            ADC_CHANNEL3    4           1
+            ADC_CHANNEL4    5           1
+            ADC_CHANNEL5    6           1
+            GYROMETER       7           3
+            ACCELEROMETER   8           3
+            EULER_ANGLES    9           3
+            COMPASS         10          4                    
+            IMU_DATA        11          13
+            PWM_SIGNALS     12          2
+            MOTOR_CURRENTS  13          2
+            WHEEL_ENCODER   14          2    
+            WHEEL_COUNTER   15          2
+            
+            To convert from a float value to S1615, do this:            
+               (int)(value * 2**15)
+            so for each of the above sensor readings, scale them as:
+               (int)(((float)value)/maximum_value * 2**15)
+               
+            Exception: the WHEEL_ENCODER has a huge range, so we just send
+               value & 0x7FFFFFFF
+            
+        example: Compass data of (90000, -45000, 135000) creates 3 packets
+                 (maximum value is 180000)
           packet 1:
-            key = key | 0b00000<<6 | 0b000000 
-            value = 0b00000000 00000000 01000000 00000000
+            key = key | 10<<6 | 0
+            value = 0b00000000 00000000 10000000 00000000
           packet 2:
-            key = key | 0b00000<<6 | 0b000001 
+            key = key | 10<<6 | 0b000001 
             value = 0b11111111 11111111 11100000 00000000
           packet 3:
-            key = key | 0b00000<<6 | 0b000010 
+            key = key | 10<<6 | 0b000010 
             value = 0b00000000 00000000 01100000 00000000
             
         
@@ -52,28 +69,35 @@ Protocol for SpiNNaker <-> PushBot
    - on receive packet, look at bottom 11 bits of key
        - 5 bits for id, 6 bits for dimension
        - iiiiidddddd
-       - values are all s1615
-           - for boolean values, still use s1615, interpret <0 as off and >=0 as on
-           - for freq, interpret 0 as 0 and +1 as max frequency
+   - payload: value    
+       - always in S1615
+       - to convert to integer: (value*maximum_value)>>15
+       - to convert to boolean: (value & 0xA000)
            
    - id for outputs
-        Track power    id: 0b00000   dimensions: 2
-        Track speed    id: 0b00001   dimensions: 2
-        Top LED        id: 0b00010   dimensions: 3 (0: freq,
-                                                    1: front on/off, 
-                                                    2: back on/off)
-        Beep           id: 0b00011   dimensions: 2 (0: freq, 1: on/off)
-        Laser pointer  id: 0b00100   dimensions: 2 (0: freq, 1: on/off)
-        
-        Digital out    id: 0b01000   dimensions: 6
-        Raw PWM        id: 0b01001   dimensions: 6
+        Track power    id: 0   dimensions: 2 (left, right)
+        Track speed    id: 1   dimensions: 2 (left, right)
+        Top LED        id: 2   dimensions: 3 (freq, front?, back?)
+        Beep           id: 3   dimensions: 2 (freq, on?)
+        Laser pointer  id: 4   dimensions: 2 (freq, on?)        
+        Digital out    id: 8   dimensions: 6
+        Raw PWM        id: 9   dimensions: 6
         
     - Special configuration packet    
-        Config         id: 0b11111   dimensions: 2
-      for dimension 0, the payload is a bitfield saying which values to send
-          where the 32 bits indicate the id of the sensor to turn on/off          
-      for dimension 1, the payload is the period for sending (in units of whatever
-          the tick for the microcontroller is or whatever's easiest)
+        Config         id: 31  dimensions: 2 (flags, freq)
+          for flags (dimension 0), payload is a bitfield of which data to stream
+          in the same format as the !S command
+             - so receiving a packet with (key & 0x3FF)==(0x3C) would send
+                !S-,65535               # turn off all streaming
+                !S+,<payload>           # turn on the requested streams
+          for freq (dimension 1), payload is the period in milliseconds
+                !S+,0,<payload>
+                
+          Note that the ids listed here are in the same order as the bit
+          flags in the robot spec at 
+              https://wiki.lsr.ei.tum.de/nst/documentation/edvs-4337      
+          with the exception of id 14 and id 15, and using !E+ and !E-
+          for the camera streaming, which we send as bit 16.
         
         
 - UDP in/out is handled via standard SpiNNaker IPTags
