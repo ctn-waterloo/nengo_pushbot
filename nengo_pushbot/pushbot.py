@@ -47,7 +47,7 @@ class PushBot(object):
             self.send_motor(0, 0, force=True)
 
 
-    def update_sensors(self):
+    def update_sensors(self, t):
         assert self.socket is not None
         self.ticks += 1
         self.view *= 0
@@ -79,6 +79,7 @@ class PushBot(object):
 
         except socket.error:
             pass
+        return []
 
 
 
