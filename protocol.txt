@@ -1,0 +1,92 @@
+Protocol for SpiNNaker <-> PushBot 
+
+- PushBot has a key stem (indicating virtual x,y,p location in SpiNNaker network)
+    - default: FE FF F8 00 (bottom 11 bits must be zero)
+    - settable somehow (perhaps by adjusting firmware? or via UDP command?)
+    - each type of sensor/motor gets an identifier (with overlap between
+       sensors and motors)
+    - each (non-retina) sensor fires values either at a regular rate or on change
+        - can't send all the packets at once, so if they go at a regular rate
+           (e.g. every 10ms) then stagger the packets over that 10ms
+    
+- PushBot -> SpiNNaker
+    - Retina event causes multicast packet
+        id: 0b10000
+        key: key | id<<6
+        payload: xxxxxxxx xxxxxxxx syyyyyyy yyyyyyyy
+    - Greyscale
+        id: 0b10001     
+        key: key | id<<6
+        payload: xxxxxxxx xxxxyyyy yyyyyyyy vvvvvvvv
+    - Other sensors
+        One packet sent per dimension of the sensor
+        payload: 32-bit value in S1615 format where the 
+                 expected sensor range is -1 to 1
+        dimension: 6-bit value
+        key: key | id<<6 | dim
+        
+        id for sensors
+            Compass         0b00000
+            Gyro            0b00001
+            Accel           0b00010
+            IMU_quaternion  0b00011
+            Power_draw      0b00100
+            Battery_volt    0b00101
+            Wheel_counter   0b00110 (32-bit int as payload)
+            Wheel_encoder   0b00111
+            Analog          0b01000
+        
+        example: Compass data of (0.5, -0.25, 0.75) creates 3 packets
+          packet 1:
+            key = key | 0b00000<<6 | 0b000000 
+            value = 0b00000000 00000000 01000000 00000000
+          packet 2:
+            key = key | 0b00000<<6 | 0b000001 
+            value = 0b11111111 11111111 11100000 00000000
+          packet 3:
+            key = key | 0b00000<<6 | 0b000010 
+            value = 0b00000000 00000000 01100000 00000000
+            
+        
+- SpiNNaker -> PushBot
+   - on receive packet, look at bottom 11 bits of key
+       - 5 bits for id, 6 bits for dimension
+       - iiiiidddddd
+       - values are all s1615
+           - for boolean values, still use s1615, interpret <0 as off and >=0 as on
+           - for freq, interpret 0 as 0 and +1 as max frequency
+           
+   - id for outputs
+        Track power    id: 0b00000   dimensions: 2
+        Track speed    id: 0b00001   dimensions: 2
+        Top LED        id: 0b00010   dimensions: 3 (0: freq,
+                                                    1: front on/off, 
+                                                    2: back on/off)
+        Beep           id: 0b00011   dimensions: 2 (0: freq, 1: on/off)
+        Laser pointer  id: 0b00100   dimensions: 2 (0: freq, 1: on/off)
+        
+        Digital out    id: 0b01000   dimensions: 6
+        Raw PWM        id: 0b01001   dimensions: 6
+        
+        
+- UDP in/out is handled via standard SpiNNaker IPTags
+
+
+        
+        
+                                                            
+                                                            
+        
+        
+       
+       
+       
+           
+        
+            
+        
+        
+    
+    
+    
+    
