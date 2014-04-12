@@ -9,9 +9,7 @@
 # ----------------------------------------------------------------------------
 
 APP = nengo_pushbot_tracks
-SOURCES = tracks-main.c ${SPINN_NENGO_DIRS}/ensemble/ensemble-input.c
+SOURCES = tracks-main.c tracks-input.c
 OBJECTS = $(SOURCES:.c=.o)
-
-CFLAGS += -I $(SPINN_NENGO_DIRS)/ensemble/
 
 include ../Makefile.depend
