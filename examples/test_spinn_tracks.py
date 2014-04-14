@@ -7,7 +7,7 @@ model = nengo.Network()
 with model:
     #input = nengo.Node(lambda t: [0.5*np.sin(10*t), 0.5*np.cos(10*t)])
 
-    input = nengo.Node([-1.0, 1.0])
+    input = nengo.Node([0, 0.75])
     a = nengo.Ensemble(nengo.LIF(100), dimensions=2)
     #b = nengo.Ensemble(nengo.LIF(100), dimensions=2)
 
