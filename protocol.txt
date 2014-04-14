@@ -81,7 +81,7 @@ Protocol for SpiNNaker <-> PushBot
         Beep           id: 3   dimensions: 2 (freq, on?)
         Laser pointer  id: 4   dimensions: 2 (freq, on?)        
         Digital out    id: 8   dimensions: 6
-        Raw PWM        id: 9   dimensions: 6
+        Raw PWM        id: 9   dimensions: 2
         
     - Special streaming configuration packet    
         Config streams id: 31  dimensions: 2 (camera, sensors)
@@ -113,22 +113,22 @@ Examples:
         key = ******** ******** *****000 01000001   (id=1, dim=1)
         payload = 00000000 00000000 01000000 00000000
             (value = (payload*100)>>15 = 50)
-        command: "!M1=50"
+        command: "!M1=50\n"
         
     Turn on camera streaming:
         key = ******** ******** *****111 11000001   (id=31, dim=1)    
         payload = 00000000 00000000 00000000 00000001
-        command = "!E+"
+        command = "!E+\n"
         
     Turn off camera streaming:
         key = ******** ******** *****111 11000001   (id=31, dim=1)    
         payload = 00000000 00000000 00000000 00000000
-        command = "!E-"
+        command = "!E-\n"
         
     Turn on gyro and battery streaming every 10ms:
         key = ******** ******** *****111 11000000   (id=31, dim=0)    
         payload = 0000000A 00000000 00000100 10000000
-        command = "!S-,65535,10\n!S+,2304,10"
+        command = "!S-,65535,10\n!S+,2304,10\n"
         
         
   PushBot -> SpiNNaker

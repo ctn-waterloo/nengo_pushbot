@@ -22,10 +22,12 @@ class PushBot(object):
 
         self.view = np.zeros((128, 128), dtype=float)
         self.ticks = 0
+        self.vertex = None
 
 
     def send_motor(self, left, right, force=False):
-        assert self.socket is not None
+        if self.socket is None:
+            return []
         now = time.time()
         if force or self.last_message_time is None or (now >
                 (self.last_message_time + self.message_delay)):
@@ -81,9 +83,33 @@ class PushBot(object):
             pass
         return []
 
+    def get_bot_vertex(self, builder):
+        if self.vertex is None:
+            self.vertex = PushBotVertex()
+            builder.add_vertex(self.vertex)
+        return self.vertex
 
 
+try:
+    import nengo_spinnaker
+except ImportError:
+    nengo_spinnaker = None
 
 
+if nengo_spinnaker is not None:
+    from pacman103.lib import data_spec_gen, graph
+    from pacman103.front import common
+    import nengo_spinnaker.nengo_vertex
+    class PushBotVertex(common.ExternalDeviceVertex):
+        model_name = "nengo_pushbot"
+
+        def __init__(self,
+                     virtual_chip_coords=dict(x=0xFE, y=0xFF),
+                     connected_node_coords=dict(x=1, y=0),
+                     connected_node_edge=0):   # 0 is EAST, 1 is NORTH_EAST
+            super(PushBotVertex, self).__init__(n_neurons=0,
+                virtual_chip_coords=virtual_chip_coords,
+                connected_node_coords=connected_node_coords,
+                connected_node_edge=connected_node_edge)
 
 
