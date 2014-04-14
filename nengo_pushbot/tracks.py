@@ -21,7 +21,7 @@ class Tracks(nengo.Node):
     def spinnaker_build(self, builder):
         import nengo_spinnaker.filter_vertex
         self.vertex = nengo_spinnaker.filter_vertex.FilterVertex(
-            dimensions=2, output_id=1, output_period=100, label=self.label)
+            dimensions=2, output_id=1, output_period=10, label=self.label)
         builder.add_vertex(self.vertex)
 
         bot_vertex = self.bot.get_bot_vertex(builder)
