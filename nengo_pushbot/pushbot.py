@@ -16,7 +16,7 @@ class PushBot(object):
 
             self.send_motor(0, 0, force=True)
             self.socket.send('E+\n')
-            self.socket.send('M+\n')
+            self.socket.send('!M+\n')
             atexit.register(self.stop)
 
         else:
@@ -39,7 +39,7 @@ class PushBot(object):
             if left < -100: left=-100
             if right > 100: right=100
             if right < -100: right=-100
-            cmd = 'M+\n!M0=%d\n!M1=%d\n' % (left, right)
+            cmd = '!MD0=%d\n!MD1=%d\n' % (left, right)
             #print cmd
 
             self.socket.send(cmd)
@@ -47,7 +47,7 @@ class PushBot(object):
         return []
     def stop(self):
         if self.socket is not None:
-            self.socket.send('M-\n')
+            self.socket.send('!M-\n')
             self.socket.send('E-\n')
             #self.send_motor(0, 0, force=True)
 
