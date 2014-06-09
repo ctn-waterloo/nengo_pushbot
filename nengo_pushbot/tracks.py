@@ -31,11 +31,6 @@ class Tracks(nengo.Node):
 
 
 
-# inform nengo that this Node should be built like a normal Node
-from nengo.builder import _builder_func_dict as bfd
-bfd[Tracks] = bfd[nengo.Node]
-
-
 #inform nengo_spinnaker that this Node should be handled specially
 if nengo_spinnaker is not None:
     import nengo_spinnaker.builder
