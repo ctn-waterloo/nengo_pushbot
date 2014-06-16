@@ -8,10 +8,11 @@ with model:
     input = nengo.Node(lambda t: [0.5*np.sin(t), 0.5*np.cos(t)], label='input')
     a = nengo.Ensemble(100, dimensions=2, label='a')
 
-    bot = nengo_pushbot.PushBotNetwork('ctndroid.uwaterloo.ca', port=56044, message_delay=0.001, label='Pushbot')
+    bot = nengo_pushbot.PushBotNetwork('10.162.177.43', port=56000, message_delay=0.001, label='Pushbot')
 
     nengo.Connection(input, a, synapse=None)
     nengo.Connection(a, bot.tracks, synapse=0.01)
+    nengo.Probe(a)
 
 import nengo_gui.javaviz
 jv = nengo_gui.javaviz.View(model)
