@@ -10,13 +10,13 @@ class PulseBot(nengo_pushbot.PushBot):
         self.last_spike = np.zeros((128, 128), dtype=int)
 
     def update_sensors(self, t):
-        super(PulseBot, self).update_sensors()
+        super(PulseBot, self).update_sensors(t)
 
         decay = np.exp(-0.001/0.03)
         self.view2 = self.view2*decay + (1-decay)*self.view
 
-        diff = self.last_spike[data_x, data_y]
-        self.last_spike[data_x, data_y] = self.tick
+        #diff = self.last_spike[data_x, data_y]
+        #self.last_spike[data_x, data_y] = self.tick
         return []
 
 
@@ -29,7 +29,7 @@ class PulseView(nengo_pushbot.RetinaView):
 
 model = nengo.Network()
 with model:
-    bot = nengo_pushbot.PushBotNetwork('10.162.177.45', bot_class=PulseBot)
+    bot = nengo_pushbot.PushBotNetwork('10.162.177.43', bot_class=PulseBot)
 
 
 
