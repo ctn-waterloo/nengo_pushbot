@@ -5,20 +5,21 @@ import thread
 import numpy as np
 
 class BlinkTracker(object):
-    def __init__(self, socket, freq):
+    def __init__(self, socket, freqs):
         self.socket = socket
         self.socket.settimeout(0)
         time.sleep(0.5)
         self.socket.send('\n\n!E1\nE+\n')
-        self.period = int(500000/freq)
+        freqs = np.array(freqs, dtype=float)
+        self.periods = 500000/freqs
 
         self.image = np.zeros((128, 128), dtype=float)
         self.last_on = np.zeros((128, 128), dtype=np.uint16)
         self.last_off = np.zeros((128, 128), dtype=np.uint16)
-        self.p_x = 64.0
-        self.p_y = 64.0
+        self.p_x = np.zeros_like(self.periods) + 64.0
+        self.p_y = np.zeros_like(self.periods) + 64.0
         self.event_count = 0
-        self.good_events = 0
+        self.good_events = np.zeros_like(self.periods, dtype=int)
         thread.start_new_thread(self.update_loop, ())
 
     def clear_image(self):
@@ -26,9 +27,9 @@ class BlinkTracker(object):
 
     def certainty(self):
         if self.event_count == 0:
-            return 0.0
+            return np.zeros_like(self.periods)
         c = self.good_events / float(self.event_count)
-        self.good_events = 0
+        self.good_events *= 0
         self.event_count = 0
         return c
 
@@ -80,22 +81,23 @@ class BlinkTracker(object):
                 self.last_on[data_x[index_on], data_y[index_on]] = time[index_on]
                 self.last_off[data_x[index_off], data_y[index_off]] = time[index_off]
 
-                eta = 0.2
-                t_exp = self.period
-                sigma_t = 20
-                t_diff = delta.astype(np.float) - t_exp
-                try:
-                    w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
-                    #print (w_t>0.5).sum(), len(w_t)
-                    self.event_count += len(w_t)
-                    self.good_events += (w_t>0.5).sum()
-                    r_x = np.average(data_x, weights=w_t)
-                    r_y = np.average(data_y, weights=w_t)
+                self.event_count += len(delta)
 
-                    self.p_x = (1-eta)*self.p_x + (eta)*r_x
-                    self.p_y = (1-eta)*self.p_y + (eta)*r_y
-                except ZeroDivisionError:
-                    pass
+                for i, period in enumerate(self.periods):
+                    eta = 0.2
+                    t_exp = period
+                    sigma_t = 20
+                    t_diff = delta.astype(np.float) - t_exp
+                    try:
+                        w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
+                        self.good_events[i] += (w_t>0.5).sum()
+                        r_x = np.average(data_x, weights=w_t)
+                        r_y = np.average(data_y, weights=w_t)
+
+                        self.p_x[i] = (1-eta)*self.p_x[i] + (eta)*r_x
+                        self.p_y[i] = (1-eta)*self.p_y[i] + (eta)*r_y
+                    except ZeroDivisionError:
+                        pass
 
             except socket.error:
                 pass
