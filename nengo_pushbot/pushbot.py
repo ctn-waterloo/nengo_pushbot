@@ -68,7 +68,7 @@ class PushBot(object):
                 data_all = np.fromstring(data, dtype=np.uint8)
                 data_x = data_all[::2]
 
-                errors = np.where(data_x >= 0x80)[0]
+                errors = np.where(data_x < 0x80)[0]
                 if len(errors) > 0:
                     old_data = data[errors[0]*2+1:]
                     continue
@@ -92,7 +92,7 @@ class PushBot(object):
             builder.add_vertex(self.vertex)
         return self.vertex
 
-
+"""
 try:
     import nengo_spinnaker
 except ImportError:
@@ -114,5 +114,5 @@ if nengo_spinnaker is not None:
                 virtual_chip_coords=virtual_chip_coords,
                 connected_node_coords=connected_node_coords,
                 connected_node_edge=connected_node_edge)
-
+"""
 
