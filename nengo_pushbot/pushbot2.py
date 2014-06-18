@@ -25,7 +25,7 @@ class PushBot2(object):
         if force or self.last_time.get(key, None) is None or (now >
                 self.last_time[key]+self.message_delay):
             self.socket.send(cmd)
-            print cmd
+            #print cmd
             self.last_time[key] = now
 
     def motor(self, left, right, force=False):
