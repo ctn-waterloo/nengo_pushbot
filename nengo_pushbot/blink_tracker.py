@@ -37,13 +37,16 @@ class BlinkTracker(object):
         old_data = None
         while True:
             try:
+                # read a block of events at a time
                 data = self.socket.recv(1024)
                 if old_data is not None:
                     data = old_data + data
                     old_data = None
 
+                # conver to bytes
                 data_all = np.fromstring(data, np.uint8)
 
+                # detect transmission errors
                 data_x = data_all[::4]
                 errors = np.where(data_x < 0x80)[0]
                 if len(errors) > 0:
@@ -63,6 +66,7 @@ class BlinkTracker(object):
                     data_all = data_all[:-(len(data_all)%4)]
                     data_x = data_all[::4]
 
+                # start algorithm
                 data_x = data_x & 0x7F
                 data_y = data_all[1::4]
                 index_on = (data_y & 0x80) > 0
@@ -83,6 +87,7 @@ class BlinkTracker(object):
 
                 self.event_count += len(delta)
 
+                # loop through the different frequencies we're looking for
                 for i, period in enumerate(self.periods):
                     eta = 0.2
                     t_exp = period
@@ -90,10 +95,16 @@ class BlinkTracker(object):
                     t_diff = delta.astype(np.float) - t_exp
                     try:
                         w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
+                        # haven't done w_p yet
+
+                        # horrible heuristic for figuring out if we have good
+                        # data by chekcing the proportion of events that are
+                        # within sigma_t of desired period
                         self.good_events[i] += (w_t>0.5).sum()
+
+                        # update position estimate
                         r_x = np.average(data_x, weights=w_t)
                         r_y = np.average(data_y, weights=w_t)
-
                         self.p_x[i] = (1-eta)*self.p_x[i] + (eta)*r_x
                         self.p_y[i] = (1-eta)*self.p_y[i] + (eta)*r_y
                     except ZeroDivisionError:
