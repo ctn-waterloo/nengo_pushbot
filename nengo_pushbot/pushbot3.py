@@ -5,21 +5,33 @@ import struct
 import atexit
 import thread
 
+
+
+
 class PushBot3(object):
     sensors = dict(compass=512)
 
+    running_bots = {}
+
+    @classmethod
+    def get_bot(klass, address, port=56000):
+        key = (address, port)
+        if key not in PushBot3.running_bots:
+            PushBot3.running_bots[key] = PushBot3(address, port)
+        return PushBot3.running_bots[key]
+
+
     def __init__(self, address, port=56000, message_delay=0.01):
-        print 'connecting...'
+        print 'connecting...', address
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((address, port))
         self.socket.settimeout(0)
         self.message_delay = message_delay
         self.last_time = {}
 
-        print 'connected to', address
-
         self.motor(0, 0, force=True)
         self.socket.send('\n\nR\n\n')  # reset the board
+        time.sleep(5)
         #self.socket.send('E+\n')       # turn on retina
         self.socket.send('!M+\n')      # activate motors
         atexit.register(self.stop)
@@ -47,7 +59,6 @@ class PushBot3(object):
         for i in range(3):
             if diff[i] > 0:
                 value[i] = ((data[i]-self.compass_range[1][i])/diff[i] - 0.5) *2
-        print value
         self.sensor['compass'] = value
 
 
@@ -108,7 +119,6 @@ class PushBot3(object):
         if force or self.last_time.get(key, None) is None or (now >
                 self.last_time[key]+self.message_delay):
             self.socket.send(cmd)
-            #print cmd
             self.last_time[key] = now
 
     def activate_sensor(self, name, freq):
