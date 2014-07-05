@@ -1,4 +1,3 @@
-import serial
 import socket
 import time
 import thread
@@ -9,7 +8,7 @@ class BlinkTracker(object):
         self.socket = socket
         self.socket.settimeout(0)
         time.sleep(0.5)
-        self.socket.send('\n\n!E1\nE+\n')
+        self.socket.send('\n\n!E2\nE+\n')
         freqs = np.array(freqs, dtype=float)
         self.periods = 500000/freqs
 
@@ -50,6 +49,7 @@ class BlinkTracker(object):
                 data_x = data_all[::4]
                 errors = np.where(data_x < 0x80)[0]
                 if len(errors) > 0:
+                    print 'error', len(errors)
                     off1 = np.where(data_all[1::4] < 0x80)
                     if len(off1[0]) == 0:
                         data_all = data_all[1:]
@@ -91,7 +91,7 @@ class BlinkTracker(object):
                 for i, period in enumerate(self.periods):
                     eta = 0.2
                     t_exp = period
-                    sigma_t = 20
+                    sigma_t = 100
                     t_diff = delta.astype(np.float) - t_exp
                     try:
                         w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
