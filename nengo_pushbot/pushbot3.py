@@ -9,7 +9,7 @@ import thread
 
 
 class PushBot3(object):
-    sensors = dict(compass=512)
+    sensors = dict(compass=512, accel=256)
 
     running_bots = {}
 
@@ -32,19 +32,25 @@ class PushBot3(object):
         self.motor(0, 0, force=True)
         self.socket.send('\n\nR\n\n')  # reset the board
         time.sleep(5)
-        #self.socket.send('E+\n')       # turn on retina
+        #self.socket.send('!E2\nE+\n')  # turn on retina
         self.socket.send('!M+\n')      # activate motors
         atexit.register(self.stop)
 
         self.ticks = 0
         self.vertex = None
 
-        self.sensor = dict(compass=[0,0,0])
+        self.sensor = dict(compass=[0,0,0], accel=[0,0,0])
         self.compass_range = None
         thread.start_new_thread(self.sensor_loop, ())
 
     def get_compass(self):
         return self.sensor['compass']
+    def get_accel(self):
+        return self.sensor['accel']
+
+    def set_accel(self, data):
+        x, y, z = data
+        self.sensor['accel'] = float(x)/10000, float(y)/10000, float(z)/10000
 
     def set_compass(self, data):
         if self.compass_range is None:
@@ -62,16 +68,14 @@ class PushBot3(object):
         self.sensor['compass'] = value
 
 
-
-
-
-
-
     def process_ascii(self, msg):
         #try:
             if msg.startswith('-S9 '):
                 x,y,z = msg[4:].split(' ')
                 self.set_compass((int(x), int(y), int(z)))
+            elif msg.startswith('-S8 '):
+                x,y,z = msg[4:].split(' ')
+                self.set_accel((int(x), int(y), int(z)))
             else:
                 print 'unknown msg', msg
         #except:
