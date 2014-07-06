@@ -43,7 +43,27 @@ class PushBot3(object):
 
         self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0])
         self.compass_range = None
+
+        self.image = None
         thread.start_new_thread(self.sensor_loop, ())
+
+    def show_image(self):
+        if self.image is None:
+            self.image = np.zeros((128, 128), dtype=float)
+            thread.start_new_thread(self.image_loop, ())
+
+
+
+    def image_loop(self):
+        import pylab
+        pylab.ion()
+        img = pylab.imshow(self.image, vmax=1, vmin=-1,
+                                       interpolation='none', cmap='binary')
+        while True:
+            pylab.draw()
+            pylab.pause(0.00001)
+            img.set_data(self.image)
+            self.image *= 0.5
 
     def get_compass(self):
         return self.sensor['compass']
@@ -135,12 +155,12 @@ class PushBot3(object):
                 pass
 
     def process_retina(self, data):
+        if self.image is not None:
+            x = data[::4] & 0x7f
+            y = data[1::4] & 0x7f
+            value = np.where(data[1::4]>=0x80, 1, -1)
+            self.image[x, y] += value
         assert len(data) % 4 == 0
-
-
-
-
-
 
     def send(self, key, cmd, force):
         now = time.time()
@@ -202,9 +222,9 @@ class PushBot3(object):
 
 if __name__ == '__main__':
     bot = PushBot3('10.162.177.55')
-    time.sleep(2)
     bot.activate_sensor('compass', freq=100)
     bot.activate_sensor('gyro', freq=100)
+    bot.show_image()
     import time
 
     while True:

@@ -11,6 +11,9 @@ class PushBotNetwork(nengo.Network):
         self._gyro = None
         self._accel = None
 
+    def show_image(self):
+        self.bot.show_image()
+
     @property
     def motor(self):
         if self._motor is None:
