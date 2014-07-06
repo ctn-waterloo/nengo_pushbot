@@ -33,7 +33,7 @@ class PushBot3(object):
         self.motor(0, 0, force=True)
         self.socket.send('\n\nR\n\n')  # reset the board
         time.sleep(2)
-        #self.socket.send('!E2\nE+\n')  # turn on retina
+        self.socket.send('!E2\nE+\n')  # turn on retina
         self.socket.send('!M+\n')      # activate motors
         atexit.register(self.stop)
         print '...connected'
@@ -77,54 +77,65 @@ class PushBot3(object):
 
 
     def process_ascii(self, msg):
-        #try:
-            if msg.startswith('-S9 '):
-                x,y,z = msg[4:].split(' ')
-                self.set_compass((int(x), int(y), int(z)))
-            elif msg.startswith('-S8 '):
-                x,y,z = msg[4:].split(' ')
-                self.set_accel((int(x), int(y), int(z)))
-            elif msg.startswith('-S7 '):
-                x,y,z = msg[4:].split(' ')
-                self.set_gyro((int(x), int(y), int(z)))
-            elif msg.startswith('!MVD'):
+        index = msg.find('-')
+        if index > -1:
+            msg = msg[index:]
+            try:
+                if msg.startswith('-S9 '):
+                    x,y,z = msg[4:].split(' ')
+                    self.set_compass((int(x), int(y), int(z)))
+                elif msg.startswith('-S8 '):
+                    x,y,z = msg[4:].split(' ')
+                    self.set_accel((int(x), int(y), int(z)))
+                elif msg.startswith('-S7 '):
+                    x,y,z = msg[4:].split(' ')
+                    self.set_gyro((int(x), int(y), int(z)))
+                else:
+                    pass
+                    #print 'unknown msg', msg
+            except:
                 pass
-            else:
-                print 'unknown msg', msg
-        #except:
-        #    print 'invalid msg', msg
+                #print 'invalid msg', msg
 
     def sensor_loop(self):
         old_data = None
-
-        self.buffered_ascii = ''
+        buffered_ascii = ''
         while True:
             try:
                 data = self.socket.recv(1024)
-                #if old_data is not None:
-                #    data = old_data + data
-                #    old_data = None
+                if old_data is not None:
+                    data = old_data + data
+                data_all = np.fromstring(data, np.uint8)
+                ascii_index = np.where(data_all[::4] < 0x80)[0]
 
-                while '\n' in data:
-                    cmd, data = data.split('\n', 1)
-                    self.process_ascii(self.buffered_ascii + cmd)
-                    self.buffered_ascii = ''
+                offset = 0
+                while len(ascii_index) > 0:
+                    index = ascii_index[0]*4
+                    stop_index = np.where(data_all[index:] >=0x80)[0]
+                    if len(stop_index) > 0:
+                        stop_index = index + stop_index[0]
+                    else:
+                        stop_index = len(data)
+                    buffered_ascii += data[offset+index:offset+stop_index]
+                    data_all = np.hstack((data_all[:index], data_all[stop_index:]))
+                    offset += stop_index - index
+                    ascii_index = np.where(data_all[::4] < 0x80)[0]
 
-                self.buffered_ascii += data
+                extra = len(data_all) % 4
+                if extra != 0:
+                    old_data = data[-extra:]
+                    data_all = data_all[:-extra]
+                self.process_retina(data_all)
 
+                while '\n' in buffered_ascii:
+                    cmd, buffered_ascii = buffered_ascii.split('\n', 1)
+                    self.process_ascii(cmd)
 
-                """
-                data_all = np.fromstring(data, np.unit8)
-                ascii_all = np.where(data_all < 0x80)[0]
-                data_x = data_all[::4]
-                ascii_x = asci_all[::4]
-                if len(ascii_x) > 0:
-                    index = ascii_x[0]*4
-                    ascii = asci_all[index:]
-                    nonascii =
-                """
             except socket.error as e:
                 pass
+
+    def process_retina(self, data):
+        assert len(data) % 4 == 0
 
 
 
@@ -190,9 +201,10 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    bot = PushBot3('10.162.177.51')
+    bot = PushBot3('10.162.177.55')
     time.sleep(2)
-    bot.activate_sensor('compass', freq=10)
+    bot.activate_sensor('compass', freq=100)
+    bot.activate_sensor('gyro', freq=100)
     import time
 
     while True:
