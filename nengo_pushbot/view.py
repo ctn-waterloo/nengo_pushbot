@@ -7,7 +7,9 @@ class RetinaView(object):
         thread.start_new_thread(self.update_loop, ())
 
     def get_image(self):
-        return self.bot.view
+        img = self.bot.image
+        self.bot.clear_image()
+        return img
     def get_image_range(self):
         return -1, 1
 
@@ -15,8 +17,9 @@ class RetinaView(object):
         import pylab
         pylab.ion()
         vmin, vmax = self.get_image_range()
-        self.img = pylab.imshow(self.bot.view, vmin=vmin, vmax=vmax,
+        self.img = pylab.imshow(self.bot.image, vmin=vmin, vmax=vmax,
                                 cmap='gray', interpolation='none')
         while True:
             self.img.set_data(self.get_image())
             pylab.draw()
+            #pylab.pause(0.001)

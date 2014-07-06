@@ -35,7 +35,7 @@ class PushBot2(object):
             if left < -100: left=-100
             if right > 100: right=100
             if right < -100: right=-100
-            cmd = '!MD0=%d\n!MD1=%d\n' % (left, right)
+            cmd = '!MVD0=%d\n!MVD1=%d\n' % (left, right)
             self.send('motor', cmd, force)
     def beep(self, freq, force=False):
         if freq <= 0:
@@ -47,7 +47,7 @@ class PushBot2(object):
         if freq <= 0:
             cmd = '!PA=0\n!PA0=0\n'
         else:
-            cmd = '!PA=%d\n!PA0=%%50\n' % int(1000000/freq)
+            cmd = '!PA=%d\n!PA0=%d\n' % (int(1000000/freq), int(500000/freq))
         self.send('laser', cmd, force)
     def led(self, freq, force=False):
         if freq <= 0:
@@ -59,8 +59,8 @@ class PushBot2(object):
     def stop(self):
         if self.socket is not None:
             self.beep(0, force=True)
-            self.laser(0, force=True)
-            self.led(0, force=True)
+            #self.laser(0, force=True)
+            #self.led(0, force=True)
             self.socket.send('!M-\n')
             self.socket.send('E-\n')
             #self.send_motor(0, 0, force=True)

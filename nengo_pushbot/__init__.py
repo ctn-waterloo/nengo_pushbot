@@ -6,3 +6,10 @@ from realtime import Realtime
 from view import RetinaView
 from network import PushBotNetwork
 from blink_tracker import BlinkTracker
+
+from compass import Compass
+from gyro import Gyro
+from accel import Accel
+from motor import Motor
+from beep import Beep
+

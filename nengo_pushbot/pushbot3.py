@@ -9,7 +9,7 @@ import thread
 
 
 class PushBot3(object):
-    sensors = dict(compass=512, accel=256)
+    sensors = dict(compass=512, accel=256, gyro=128)
 
     running_bots = {}
 
@@ -26,20 +26,22 @@ class PushBot3(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((address, port))
         self.socket.settimeout(0)
+        self.key = (address, port)
         self.message_delay = message_delay
         self.last_time = {}
 
         self.motor(0, 0, force=True)
         self.socket.send('\n\nR\n\n')  # reset the board
-        time.sleep(5)
+        time.sleep(2)
         #self.socket.send('!E2\nE+\n')  # turn on retina
         self.socket.send('!M+\n')      # activate motors
         atexit.register(self.stop)
+        print '...connected'
 
         self.ticks = 0
         self.vertex = None
 
-        self.sensor = dict(compass=[0,0,0], accel=[0,0,0])
+        self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0])
         self.compass_range = None
         thread.start_new_thread(self.sensor_loop, ())
 
@@ -47,10 +49,16 @@ class PushBot3(object):
         return self.sensor['compass']
     def get_accel(self):
         return self.sensor['accel']
+    def get_gyro(self):
+        return self.sensor['gyro']
 
     def set_accel(self, data):
         x, y, z = data
         self.sensor['accel'] = float(x)/10000, float(y)/10000, float(z)/10000
+
+    def set_gyro(self, data):
+        x, y, z = data
+        self.sensor['gyro'] = float(x)/5000, float(y)/5000, float(z)/5000
 
     def set_compass(self, data):
         if self.compass_range is None:
@@ -76,6 +84,11 @@ class PushBot3(object):
             elif msg.startswith('-S8 '):
                 x,y,z = msg[4:].split(' ')
                 self.set_accel((int(x), int(y), int(z)))
+            elif msg.startswith('-S7 '):
+                x,y,z = msg[4:].split(' ')
+                self.set_gyro((int(x), int(y), int(z)))
+            elif msg.startswith('!MVD'):
+                pass
             else:
                 print 'unknown msg', msg
         #except:
@@ -110,7 +123,7 @@ class PushBot3(object):
                     ascii = asci_all[index:]
                     nonascii =
                 """
-            except socket.error:
+            except socket.error as e:
                 pass
 
 
@@ -121,14 +134,21 @@ class PushBot3(object):
     def send(self, key, cmd, force):
         now = time.time()
         if force or self.last_time.get(key, None) is None or (now >
-                self.last_time[key]+self.message_delay):
+                self.last_time[key] + self.message_delay):
             self.socket.send(cmd)
             self.last_time[key] = now
 
     def activate_sensor(self, name, freq):
         bitmask = PushBot3.sensors[name]
         period = int(1000.0/freq)
-        self.socket.send('!S+%d,%d\n' % (bitmask, period))
+        try:
+            self.socket.send('!S+%d,%d\n' % (bitmask, period))
+        except:
+            self.diconnect()
+
+    def disconnect(self):
+        del PushBot3.running_bots[self.key]
+        self.socket.close()
 
 
     def motor(self, left, right, force=False):
