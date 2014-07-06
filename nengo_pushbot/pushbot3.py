@@ -47,23 +47,25 @@ class PushBot3(object):
         self.image = None
         thread.start_new_thread(self.sensor_loop, ())
 
-    def show_image(self):
+    def show_image(self, decay = 0.5):
         if self.image is None:
             self.image = np.zeros((128, 128), dtype=float)
-            thread.start_new_thread(self.image_loop, ())
+            thread.start_new_thread(self.image_loop, (decay,))
 
 
 
-    def image_loop(self):
+    def image_loop(self, decay):
         import pylab
+        fig = pylab.figure()
         pylab.ion()
         img = pylab.imshow(self.image, vmax=1, vmin=-1,
                                        interpolation='none', cmap='binary')
+
         while True:
-            pylab.draw()
-            pylab.pause(0.00001)
             img.set_data(self.image)
-            self.image *= 0.5
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+            self.image *= decay
 
     def get_compass(self):
         return self.sensor['compass']
