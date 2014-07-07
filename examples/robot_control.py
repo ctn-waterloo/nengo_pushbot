@@ -14,16 +14,18 @@ with model:
     nengo.Connection(a, bot.motor, synapse=0.01)
     nengo.Probe(a)
 
-#import nengo_gui.javaviz
-#jv = nengo_gui.javaviz.View(model)
 
-#sim = nengo.Simulator(model)
-#jv.update_model(sim_normal)
-#jv.view()
+if __name__ == '__main__':
+    #import nengo_gui.javaviz
+    #jv = nengo_gui.javaviz.View(model)
 
-#sim.run(5000)
+    sim = nengo.Simulator(model)
+    #jv.update_model(sim_normal)
+    #jv.view()
 
-#import nengo_spinnaker
-#sim = nengo_spinnaker.Simulator(model)
-#sim.run(10)
+    sim.run(5000)
+
+    #import nengo_spinnaker
+    #sim = nengo_spinnaker.Simulator(model)
+    #sim.run(10)
 
