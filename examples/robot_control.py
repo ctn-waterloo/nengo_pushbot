@@ -17,11 +17,11 @@ with model:
 #import nengo_gui.javaviz
 #jv = nengo_gui.javaviz.View(model)
 
-sim = nengo.Simulator(model)
+#sim = nengo.Simulator(model)
 #jv.update_model(sim_normal)
 #jv.view()
 
-sim.run(5000)
+#sim.run(5000)
 
 #import nengo_spinnaker
 #sim = nengo_spinnaker.Simulator(model)
