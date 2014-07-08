@@ -32,7 +32,7 @@ class PushBot3(object):
 
         if ',' in address:
             print 'configuring for SpiNNaker', address
-            self.spinnaker_address = address
+            self.spinnaker_address = address.split(',')
             self.socket = None
             return
         print 'connecting...', address

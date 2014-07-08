@@ -32,7 +32,7 @@ try:
 
         # Investigate the objects
         for obj in objs:
-            if not isinstance(obj, (motor.Motor, beep.Beep)):
+            if isinstance(obj, (motor.Motor, beep.Beep)):
                 # Create a filter vertex between all incoming edges and the
                 # object
                 fv = nengo_spinnaker.builder.IntermediateFilter(obj.size_in)
@@ -51,7 +51,7 @@ try:
 
                 # Get the robot vertex
                 pushbot_vertex, mc_vertex, new_objs, new_conns =\
-                    get_vertex(obj.robot, new_objs, new_conns)
+                    get_vertex(obj.bot, new_objs, new_conns)
 
                 if isinstance(obj, motor.Motor):
                     # Add the motor enable/disable commands to the pushbot
@@ -139,26 +139,34 @@ try:
     nengo_spinnaker.builder.Builder.register_connectivity_transform(
         prepare_pushbot)
 
-    def get_vertex(self, objects, connections):
+    def get_vertex(bot, objects, connections):
         """Return the vertex for the robot, and an amended set of objects and
         connections.
         """
         objects = list(objects)
         connections = list(connections)
 
-        if self.external_vertex is None:
+        edge_dirs = {'EAST': 0, 'NORTH EAST': 1, 'NORTH': 2, 'WEST': 3,
+                     'SOUTH WEST': 4, 'SOUTH': 5}
+
+        if not hasattr(bot, 'external_vertex'):
             # Create the external vertex
-            self.external_vertex = PushBotVertex()
-            objects.append(self.external_vertex)
+            setattr(bot, 'external_vertex', PushBotVertex(
+                connected_node_coords=dict(
+                    x=bot.spinnaker_address[0],
+                    y=bot.spinnaker_address[1]),
+                connected_node_edge=edge_dirs[bot.spinnaker_address[2]]))
+            objects.append(bot.external_vertex)
 
             # Create a link between the multicast vertex and the pushbot
             # vertex to turn various components on
-            self.mc_vertex = nengo_spinnaker.assembler.MulticastPlayer()
-            objects.append(self.mc_vertex)
+            setattr(bot, 'mc_vertex',
+                    nengo_spinnaker.assembler.MulticastPlayer())
+            objects.append(bot.mc_vertex)
 
         # Return a reference to the external vertex, the objects and the
         # connections
-        return self.external_vertex, self.mc_vertex, objects, connections
+        return bot.external_vertex, bot.mc_vertex, objects, connections
 
     class PushBotVertex(pacman103.front.common.ExternalDeviceVertex):
         model_name = "nengo_pushbot"
