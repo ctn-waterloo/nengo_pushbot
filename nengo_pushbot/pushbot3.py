@@ -14,7 +14,7 @@ class PushBot3(object):
     running_bots = {}
 
     @classmethod
-    def get_bot(klass, address, port=56000):
+    def get_bot(cls, address, port=56000):
         key = (address, port)
         if key not in PushBot3.running_bots:
             PushBot3.running_bots[key] = PushBot3(address, port)
@@ -25,6 +25,7 @@ class PushBot3(object):
         self.image = None
         self.regions = None
         self.track_periods = None
+        self.spinnaker_address = None
 
         if ',' in address:
             print 'configuring for SpiNNaker', address
