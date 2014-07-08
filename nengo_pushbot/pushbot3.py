@@ -25,6 +25,7 @@ class PushBot3(object):
         self.image = None
         self.regions = None
         self.track_periods = None
+        self.spinnaker_address = None
 
         if ',' in address:
             print 'configuring for SpiNNaker', address
