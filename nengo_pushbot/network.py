@@ -11,6 +11,20 @@ class PushBotNetwork(nengo.Network):
         self._gyro = None
         self._accel = None
 
+    def laser(self, freq):
+        self.bot.laser(freq, force=True)
+
+    def led(self, freq):
+        self.bot.led(freq, force=True)
+
+    def count_spikes(self, **regions):
+        self.bot.count_spikes(**regions)
+        with self:
+            for k in regions.keys():
+                node = nengo_pushbot.CountSpikes(self.bot, k)
+                setattr(self, 'count_%s' % k, node)
+
+
     def show_image(self):
         self.bot.show_image()
 
