@@ -27,6 +27,9 @@ class PushBot3(object):
         self.track_periods = None
         self.spinnaker_address = None
 
+        self.laser_freq = None
+        self.led_freq = None
+
         if ',' in address:
             print 'configuring for SpiNNaker', address
             self.spinnaker_address = address.split(',')
@@ -220,6 +223,7 @@ class PushBot3(object):
 
                 self.count_regions[k] = new_count, time
             #print {k:v[0] for k,v in self.count_regions.items()}
+
         if self.track_periods is not None:
             time = data[2::4].astype(np.uint16)
             time = (time << 8) + data[3::4]
@@ -260,11 +264,6 @@ class PushBot3(object):
                     pass
             print self.p_x, self.p_y
 
-
-
-
-
-
     def send(self, key, cmd, force):
         if self.socket is None:
             return
@@ -298,24 +297,34 @@ class PushBot3(object):
             if right < -100: right=-100
             cmd = '!MVD0=%d\n!MVD1=%d\n' % (left, right)
             self.send('motor', cmd, force)
+
     def beep(self, freq, force=False):
         if freq <= 0:
             cmd = '!PB=0\n!PB0=0\n'
         else:
             cmd = '!PB=%d\n!PB0=%%50\n' % int(1000000/freq)
         self.send('beep', cmd, force)
+
     def laser(self, freq, force=False):
-        if freq <= 0:
-            cmd = '!PA=0\n!PA0=0\n'
+        if self.socket is not None:
+            if freq <= 0:
+                cmd = '!PA=0\n!PA0=0\n'
+            else:
+                cmd = '!PA=%d\n!PA0=%d\n' % (int(1000000/freq),
+                                             int(500000/freq))
+            self.send('laser', cmd, force)
         else:
-            cmd = '!PA=%d\n!PA0=%d\n' % (int(1000000/freq), int(500000/freq))
-        self.send('laser', cmd, force)
+            self.laser_freq = freq
+
     def led(self, freq, force=False):
-        if freq <= 0:
-            cmd = '!PC=0\n!PC0=0\n!PC1=0'
+        if self.socket is not None:
+            if freq <= 0:
+                cmd = '!PC=0\n!PC0=0\n!PC1=0'
+            else:
+                cmd = '!PC=%d\n!PC0=%%50\n!PC1=%%50' % int(1000000/freq)
+            self.send('led', cmd, force)
         else:
-            cmd = '!PC=%d\n!PC0=%%50\n!PC1=%%50' % int(1000000/freq)
-        self.send('led', cmd, force)
+            self.led_freq = freq
 
     def stop(self):
         if self.socket is not None:
