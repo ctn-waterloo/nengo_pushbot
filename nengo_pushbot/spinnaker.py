@@ -92,13 +92,19 @@ try:
                 ks = generic_robot_keyspace(i=1, f=1, d=1)
                 if isinstance(accel.Accel):
                     pushbot_vertex.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks, 8<<27 | 10)
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
+                                                                  8 << 27 | 10)
+                    )
                 elif isinstance(compass.Compass):
                     pushbot_vertex.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks, 9<<27 | 10)
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
+                                                                  9 << 27 | 10)
+                    )
                 elif isinstance(gyro.Gyro):
                     pushbot_vertex.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks, 7<<27 | 10)
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
+                                                                  7 << 27 | 10)
+                    )
 
                 # Modify connections from this object to have their pre as the
                 # pushbot vertex and their keys as the appropriate form
@@ -107,7 +113,8 @@ try:
                 for conn in out_conns:
                     c = nengo_spinnaker.utils.builder.IntermediateConnections.\
                         from_connection(conn)
-                        fv = nengo_spinnaker.builder.IntermediateFilter(c.pre.size_out)
+                    fv = nengo_spinnaker.builder.IntermediateFilter(
+                        c.pre.size_out)
                     if isinstance(obj, accel.Accel):
                         c.keyspace = inbound_keyspace(i=1, s=8)
                         c.transform *= 10000.

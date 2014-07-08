@@ -45,7 +45,18 @@ class PushBot3(object):
         self.compass_range = None
 
         self.image = None
+        self.regions = None
         thread.start_new_thread(self.sensor_loop, ())
+
+    def count_spikes(self, **regions):
+        self.regions = regions
+        self.count_regions = {}
+        for k,v in regions.items():
+            self.count_regions[k] = [0, 0]
+
+    def get_spike_rate(self, region):
+        return self.count_regions[region][0]
+
 
     def show_image(self, decay = 0.5):
         if self.image is None:
@@ -83,6 +94,9 @@ class PushBot3(object):
         self.sensor['gyro'] = float(x)/5000, float(y)/5000, float(z)/5000
 
     def set_compass(self, data):
+        if data[0] == 0 and data[1] == 0 and data[2] == 0:
+            # throw out invalid data
+            return
         if self.compass_range is None:
             self.compass_range = np.array([data, data], dtype=float)
         else:
@@ -147,7 +161,8 @@ class PushBot3(object):
                 if extra != 0:
                     old_data = data[-extra:]
                     data_all = data_all[:-extra]
-                self.process_retina(data_all)
+                if len(data_all) > 0:
+                    self.process_retina(data_all)
 
                 while '\n' in buffered_ascii:
                     cmd, buffered_ascii = buffered_ascii.split('\n', 1)
@@ -157,12 +172,32 @@ class PushBot3(object):
                 pass
 
     def process_retina(self, data):
+        x = data[::4] & 0x7f
+        y = data[1::4] & 0x7f
         if self.image is not None:
-            x = data[::4] & 0x7f
-            y = data[1::4] & 0x7f
             value = np.where(data[1::4]>=0x80, 1, -1)
             self.image[x, y] += value
-        assert len(data) % 4 == 0
+        if self.regions is not None:
+            tau = 0.05 * 1000000
+            for k, region in self.regions.items():
+                minx, miny, maxx, maxy = region
+                index = (minx <= x) & (x<maxx) & (miny <= y) & (y<maxy)
+                count = np.sum(index)
+                time = (int(data[-2]) << 8) + data[-1]
+
+                old_count, old_time = self.count_regions[k]
+
+                dt = time - old_time
+                if dt < 0:
+                    dt += 65536
+
+                decay = np.exp(-dt/tau)
+                new_count = old_count * decay + count * (1-decay)
+
+                self.count_regions[k] = new_count, time
+            #print {k:v[0] for k,v in self.count_regions.items()}
+
+
 
     def send(self, key, cmd, force):
         now = time.time()
@@ -223,9 +258,10 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    bot = PushBot3('10.162.177.55')
+    bot = PushBot3('10.162.177.49')
     bot.activate_sensor('compass', freq=100)
     bot.activate_sensor('gyro', freq=100)
+    bot.count_spikes(all=(0,0,128,128), left=(0,0,128,64), right=(0,64,128,128))
     bot.show_image()
     import time
 

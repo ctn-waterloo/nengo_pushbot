@@ -13,3 +13,7 @@ from accel import Accel
 from motor import Motor
 from beep import Beep
 
+from countspikes import CountSpikes
+
+import spinnaker
+
