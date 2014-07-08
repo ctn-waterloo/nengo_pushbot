@@ -6,6 +6,8 @@ import atexit
 import thread
 
 
+display_mode = 'quick'
+
 
 
 class PushBot3(object):
@@ -92,11 +94,22 @@ class PushBot3(object):
         pylab.ion()
         img = pylab.imshow(self.image, vmax=1, vmin=-1,
                                        interpolation='none', cmap='binary')
+        if self.track_periods:
+            scatter = pylab.scatter(self.p_y, self.p_x)
+        else:
+            scatter = None
 
         while True:
             img.set_data(self.image)
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+            if scatter is not None:
+                scatter.set_offsets(np.array([self.p_y, self.p_x]))
+            if display_mode == 'quick':
+                # this is much faster, but doesn't work on all systems
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+            else:
+                # this works on all systems, but is kinda slow
+                pylab.pause(0.001)
             self.image *= decay
 
     def get_compass(self):
@@ -242,12 +255,21 @@ class PushBot3(object):
                 t_diff = delta.astype(np.float) - t_exp
 
                 w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
+                w = np.sum(w_t)
+                eta *= w
+                #print w
+                #print t_diff[:5]
+                #print w_t[:5]
                 # haven't done w_p yet
 
                 # horrible heuristic for figuring out if we have good
                 # data by chekcing the proportion of events that are
                 # within sigma_t of desired period
                 self.good_events[i] += (w_t>0.5).sum()
+
+                #for j, w in enumerate(w_t):
+                #    self.p_x[i] = (1-eta*w)*self.p_x[i] + eta*w*x[j]
+                #    self.p_y[i] = (1-eta*w)*self.p_y[i] + eta*w*y[j]
 
                 # update position estimate
                 try:
@@ -258,6 +280,7 @@ class PushBot3(object):
                 except ZeroDivisionError:
                     # occurs in np.average if weights sum to zero
                     pass
+
             print self.p_x, self.p_y
 
 
@@ -328,8 +351,8 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    #bot = PushBot3('10.162.177.44')
-    bot = PushBot3('1,0,EAST')
+    bot = PushBot3('10.162.177.44')
+    #bot = PushBot3('1,0,EAST')
     bot.activate_sensor('compass', freq=100)
     bot.activate_sensor('gyro', freq=100)
     bot.count_spikes(all=(0,0,128,128), left=(0,0,128,64), right=(0,64,128,128))
