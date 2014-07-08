@@ -1,4 +1,7 @@
 import nengo
+import nengo_spinnaker
+
+spinnaker = True
 
 import nengo_pushbot
 import numpy as np
@@ -19,7 +22,13 @@ if __name__ == '__main__':
     #import nengo_gui.javaviz
     #jv = nengo_gui.javaviz.View(model)
 
-    sim = nengo.Simulator(model)
+    if spinnaker:
+        config = nengo_spinnaker.Config()
+        config[input].f_of_t = True
+        config[input].f_period = 2*np.pi
+        sim = nengo_spinnaker.Simulator(model)
+    else:
+        sim = nengo.Simulator(model)
     #jv.update_model(sim_normal)
     #jv.view()
 
