@@ -52,3 +52,32 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# Object files
+*.o
+*.ko
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.aplx
+*.elf
+*.bin
+
+# Documentation
+docs/_build/*
+
+# Spurious dot/txt files
+*.dot
+spinnaker_components/*/nengo_*.txt
+*.swp

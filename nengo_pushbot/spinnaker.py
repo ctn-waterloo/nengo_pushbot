@@ -93,28 +93,23 @@ try:
                         fv, pushbot_vertex, keyspace=pwm_keyspace(i=36, p=0))
                 new_conns.append(c)
 
-            elif isinstance(obj, (accel.Accel, compass.Compass, gyro.Gyro)):
+            elif isinstance(obj, (accel.Accel, gyro.Gyro)):
                 # Ensure the appropriate sensor is activated, then provide the
                 # appropriate edge from the pushbot vertex to the targets of
                 # the objects
                 pushbot_vertex, mc_vertex, new_objs, new_conns =\
-                    get_vertex(obj.robot, new_objs, new_conns)
+                    get_vertex(obj.bot, new_objs, new_conns)
 
                 # Add commands to enable appropriate sensors
                 ks = generic_robot_keyspace(i=1, f=1, d=1)
                 if isinstance(accel.Accel):
                     pushbot_vertex.start_packets.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
                                                                   8 << 27 | 10)
-                    )
-                elif isinstance(compass.Compass):
-                    pushbot_vertex.start_packets.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
-                                                                  9 << 27 | 10)
                     )
                 elif isinstance(gyro.Gyro):
                     pushbot_vertex.start_packets.append(
-                        nengo_spinnaker.assembler.MulticastPacket(0, ks,
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
                                                                   7 << 27 | 10)
                     )
 
@@ -123,18 +118,47 @@ try:
                 out_conns = [c for c in conns if c.pre is obj]
 
                 for conn in out_conns:
-                    c = nengo_spinnaker.utils.builder.IntermediateConnections.\
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection.\
                         from_connection(conn)
                     fv = nengo_spinnaker.builder.IntermediateFilter(
                         c.pre.size_out)
                     if isinstance(obj, accel.Accel):
                         c.keyspace = inbound_keyspace(i=1, s=8)
                         c.transform *= 10000.
-                    elif isinstance(obj, compass.Compass):
-                        c.keyspace = inbound_keyspace(i=1, s=9)
                     elif isinstance(obj, gyro.Gyro):
                         c.keyspace = inbound_keyspace(i=1, s=7)
                         c.transform *= 5000.
+
+                    new_conns.append(c)
+
+            elif isinstance(obj, compass.Compass):
+                # Get the pushbot vertex and ensure that the sensor is enabled
+                pushbot_vertex, mc_vertex, new_objs, new_conns =\
+                    get_vertex(obj.bot, new_objs, new_conns)
+
+                ks = generic_robot_keyspace(i=1, f=0, d=1)
+                pushbot_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
+                                                              9 << 27 | 10))
+
+                # Create a new compass calibration vertex and a connection from
+                # the pushbot to it.
+                cm = CompassVertex()
+                new_objs.append(cm)
+                new_conns.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        pushbot_vertex, cm, keyspace=inbound_keyspace(i=1, s=9)
+                    ))
+
+                # Swap all outbound connections
+                out_conns = [c for c in conns if c.pre is obj]
+
+                for conn in out_conns:
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection.\
+                        from_connection(conn)
+                    c.pre = cm
+                    new_conns.append(c)
+
             else:
                 # Object is not a SpiNNaker->Robot or Robot->SpiNNaker
                 new_objs.append(obj)
@@ -226,6 +250,62 @@ try:
         def generate_routing_info(self, subedge):
             return (subedge.edge.keyspace.routing_key(),
                     subedge.edge.keyspace.routing_mask)
+
+    class CompassVertex(nengo_spinnaker.utils.vertices.NengoVertex):
+        """Application to provide calibrated compass data."""
+        MODEL_NAME = 'pushbot_compass_calibrate'
+        MAX_ATOMS = 1
+        size_in = 3
+
+        def __init__(self):
+            super(CompassVertex, self).__init__(1)
+            self.regions = [None, None, None]
+
+        @classmethod
+        def get_output_keys_region(cls, cv, assembler):
+            output_keys = list()
+
+            for c in assembler.get_outgoing_connections(cv):
+                for d in range(c.width):
+                    output_keys.append(c.keyspace.key(d=d))
+
+            return nengo_spinnaker.utils.vertices.UnpartitionedListRegion(
+                output_keys)
+
+        @classmethod
+        def get_transform(cls, cv, assembler):
+            # Combine the outgoing connections
+            conns = nengo_spinnaker.utils.connections.Connections(
+                assembler.get_outgoing_connections(cv))
+
+            for tf in conns.transforms_functions:
+                assert tf.function is None
+
+            transforms = np.vstack(t.transform for t in
+                                   conns.transforms_functions)
+            print transforms
+            transform_region =\
+                nengo_spinnaker.utils.vertices.UnpartitionedMatrixRegion(
+                    transforms, formatter=nengo_spinnaker.utils.fp.bitsk)
+
+            return transforms.shape[0], transform_region
+
+        @classmethod
+        def assemble(cls, cv, assembler):
+            # Create the output keys region and add it to the instance, then
+            # return.
+            size_out, cv.regions[2] = cls.get_transform(cv, assembler)
+            cv.regions[1] = cls.get_output_keys_region(cv, assembler)
+
+            # Create the system region
+            cv.regions[0] =\
+                nengo_spinnaker.utils.vertices.UnpartitionedListRegion(
+                    [size_out])
+
+            return cv
+
+    nengo_spinnaker.assembler.Assembler.register_object_builder(
+        CompassVertex.assemble, CompassVertex)
 
 except ImportError:
     pass
