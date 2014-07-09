@@ -101,33 +101,47 @@ try:
                     get_vertex(obj.bot, new_objs, new_conns)
 
                 # Add commands to enable appropriate sensors
-                ks = generic_robot_keyspace(i=1, f=1, d=1)
-                if isinstance(accel.Accel):
+                ks = generic_robot_keyspace(i=1, f=1, d=2)
+                if isinstance(obj, accel.Accel):
                     pushbot_vertex.start_packets.append(
                         nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
-                                                                  8 << 27 | 10)
+                                                                  8 << 27 | 100)
                     )
-                elif isinstance(gyro.Gyro):
+                elif isinstance(obj, gyro.Gyro):
                     pushbot_vertex.start_packets.append(
                         nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
-                                                                  7 << 27 | 10)
+                                                                  7 << 27 | 100)
                     )
+                c = nengo_spinnaker.utils.builder.IntermediateConnection(
+                    mc_vertex, pushbot_vertex, keyspace=ks)
+                new_conns.append(c)
 
                 # Modify connections from this object to have their pre as the
                 # pushbot vertex and their keys as the appropriate form
                 out_conns = [c for c in conns if c.pre is obj]
 
+                fv = nengo_spinnaker.builder.IntermediateFilter(3)
+                if isinstance(obj, accel.Accel):
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection(
+                        pushbot_vertex, fv, synapse=None,
+                        keyspace=inbound_keyspace(i=1, s=8),
+                        is_accumulatory=False)
+                elif isinstance(obj, gyro.Gyro):
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection(
+                        pushbot_vertex, fv, synapse=None,
+                        keyspace=inbound_keyspace(i=1, s=7),
+                        is_accumulatory=False)
+                new_objs.append(fv)
+                new_conns.append(c)
+
                 for conn in out_conns:
                     c = nengo_spinnaker.utils.builder.IntermediateConnection.\
                         from_connection(conn)
-                    fv = nengo_spinnaker.builder.IntermediateFilter(
-                        c.pre.size_out)
                     if isinstance(obj, accel.Accel):
-                        c.keyspace = inbound_keyspace(i=1, s=8)
-                        c.transform *= 10000.
+                        c.transform *= 40.
                     elif isinstance(obj, gyro.Gyro):
-                        c.keyspace = inbound_keyspace(i=1, s=7)
-                        c.transform *= 5000.
+                        c.transform *= 100.
+                    c.pre = fv
 
                     new_conns.append(c)
 
@@ -136,10 +150,13 @@ try:
                 pushbot_vertex, mc_vertex, new_objs, new_conns =\
                     get_vertex(obj.bot, new_objs, new_conns)
 
-                ks = generic_robot_keyspace(i=1, f=0, d=1)
+                ks = generic_robot_keyspace(i=1, f=1, d=2)
                 pushbot_vertex.start_packets.append(
                     nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
-                                                              9 << 27 | 10))
+                                                              9 << 27 | 100))
+                c = nengo_spinnaker.utils.builder.IntermediateConnection(
+                    mc_vertex, pushbot_vertex, keyspace=ks)
+                new_conns.append(c)
 
                 # Create a new compass calibration vertex and a connection from
                 # the pushbot to it.
@@ -158,7 +175,6 @@ try:
                         from_connection(conn)
                     c.pre = cm
                     new_conns.append(c)
-
             else:
                 # Object is not a SpiNNaker->Robot or Robot->SpiNNaker
                 new_objs.append(obj)
@@ -243,8 +259,12 @@ try:
                 connected_node_coords=connected_node_coords,
                 connected_node_edge=connected_node_edge
             )
-            self.start_packets = list()
-            self.end_packets = list()
+            self.start_packets = [nengo_spinnaker.assembler.MulticastPacket(
+                0, generic_robot_keyspace(i=0, f=0, d=7).key(), 0)
+            ]
+            self.end_packets = [nengo_spinnaker.assembler.MulticastPacket(
+                0, generic_robot_keyspace(i=1, f=0, d=0).key(), 0)
+            ]
             self.index = index
 
         def generate_routing_info(self, subedge):

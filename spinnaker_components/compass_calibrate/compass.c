@@ -5,10 +5,10 @@
 #include "nengo_typedefs.h"
 
 typedef struct _key_id_t {
-  uint header:21;
-  uint index:4;
-  uint sensor:5;
   uint dimension:2;
+  uint sensor:5;
+  uint index:4;
+  uint header:21;
 } key_id_t;
 
 // Compass data
@@ -26,19 +26,21 @@ void mc_receive(uint key, uint payload) {
 
   if (info->sensor == 9) {
     // Update the stored max and min values if required
-    compass_max[info->dimension] = (compass_max[info->dimension] > payload ?
-                                    compass_max[info->dimension] :
-                                    kbits(payload));
-    compass_min[info->dimension] = (compass_min[info->dimension] < payload ?
-                                    compass_min[info->dimension] :
-                                    kbits(payload));
+    compass_max[info->dimension] =
+      (compass_max[info->dimension] > kbits(payload) ?
+       compass_max[info->dimension] : kbits(payload));
+    compass_min[info->dimension] =
+      (compass_min[info->dimension] < kbits(payload) ?
+       compass_min[info->dimension] : kbits(payload));
 
     // Determine the range for the values
     value_t range = compass_max[info->dimension] -
-                    compass_max[info->dimension];
-    if (range > 0.0k) {
+                    compass_min[info->dimension];
+
+    if ((uint) bitsk(range) > 0) {
+      value_t c__ = 1. / range;
       compass_data[info->dimension] =
-        ((kbits(payload) - compass_min[info->dimension])/ range - 0.5k) * 2.0k;
+        (((kbits(payload) - compass_min[info->dimension]) * c__) - 0.5k) * 2.0k;
     }
   }
 }
@@ -62,7 +64,6 @@ void tick(uint ticks, uint arg1) {
   for(uint d = 0; d < size_out; d++) {
     spin1_send_mc_packet(keys[d], bitsk(output[d]), WITH_PAYLOAD);
     spin1_delay_us(1);
-    io_printf(IO_BUF, "Tx %08x %k\n", keys[d], output[d]);
   }
 }
 
@@ -71,7 +72,8 @@ bool get_data(address_t addr) {
   io_printf(IO_BUF, "Size out = %d\n", size_out);
 
   // Get transforms
-  MALLOC_FAIL_FALSE(output, 3 * size_out * sizeof(value_t), "Transform");
+  MALLOC_FAIL_FALSE(output, size_out * sizeof(value_t), "Transform");
+  MALLOC_FAIL_FALSE(transform, 3 * size_out * sizeof(value_t), "Transform");
   spin1_memcpy(transform, region_start(3, addr),
                3 * size_out * sizeof(value_t));
 
