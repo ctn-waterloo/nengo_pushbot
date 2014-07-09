@@ -1,3 +1,6 @@
+# turn on laser and leds
+
+
 import nengo
 import nengo_pushbot
 

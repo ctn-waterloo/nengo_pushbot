@@ -1,3 +1,5 @@
+# use compass data to turn towards a particular direction
+
 import nengo_pushbot
 
 import nengo

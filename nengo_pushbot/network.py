@@ -2,14 +2,17 @@ import nengo
 import nengo_pushbot
 
 class PushBotNetwork(nengo.Network):
-    def __init__(self, addr, port=56000):
-        self.bot = nengo_pushbot.PushBot3.get_bot(addr, port)
+    def __init__(self, addr, port=56000, message_delay=0.01, packet_size=5):
+        self.bot = nengo_pushbot.PushBot3.get_bot(addr, port,
+                                                  message_delay=message_delay,
+                                                  packet_size=packet_size)
         self.label = 'PushBot'
         self._motor = None
         self._beep = None
         self._compass = None
         self._gyro = None
         self._accel = None
+        self._touch = None
 
     def laser(self, freq):
         self.bot.laser(freq, force=True)
@@ -24,9 +27,22 @@ class PushBotNetwork(nengo.Network):
                 node = nengo_pushbot.CountSpikes(self.bot, k)
                 setattr(self, 'count_%s' % k, node)
 
+    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3):
+        self.bot.track_freqs(freqs, sigma_t=sigma_t, sigma_p=sigma_p, eta=eta)
+        with self:
+            for i in range(len(freqs)):
+                node = nengo_pushbot.Tracker(self.bot, i)
+                setattr(self, 'tracker_%d' % i, node)
 
-    def show_image(self):
-        self.bot.show_image()
+    def show_image(self, decay=0.5):
+        self.bot.show_image(decay=decay)
+
+    @property
+    def touch(self):
+        if self._touch is None:
+            with self:
+                self._touch = nengo_pushbot.Touch(self.bot)
+        return self._touch
 
     @property
     def motor(self):

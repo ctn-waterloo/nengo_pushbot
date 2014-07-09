@@ -1,3 +1,5 @@
+# show the image from the retina
+
 import nengo
 import nengo_pushbot
 
