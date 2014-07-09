@@ -3,7 +3,7 @@ import numpy as np
 from . import accel, beep, compass, gyro, motor
 
 try:
-    import nengo_spinnaker
+    import nengo_spinnaker2
 
     import nengo_spinnaker.builder
     import pacman103.front.common
