@@ -201,6 +201,8 @@ class PushBot3(object):
                 data = self.socket.recv(1024)
                 if old_data is not None:
                     data = old_data + data
+                    old_data = None
+
                 data_all = np.fromstring(data, np.uint8)
                 ascii_index = np.where(data_all[::packet_size] < 0x80)[0]
 
