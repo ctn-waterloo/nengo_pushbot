@@ -28,7 +28,7 @@ class PushBot3(object):
         self.regions = None
         self.track_periods = None
         self.spinnaker_address = None
-        self.packet_size = 5
+        self.packet_size = 6
 
         if ',' in address:
             print 'configuring for SpiNNaker', address
@@ -54,7 +54,8 @@ class PushBot3(object):
         self.ticks = 0
         self.vertex = None
 
-        self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0])
+        self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0],
+                           touch=0)
         self.compass_range = None
 
         thread.start_new_thread(self.sensor_loop, ())
@@ -106,7 +107,7 @@ class PushBot3(object):
             #pylab.hist(self.delta, 50, range=(0000, 15000))
             img.set_data(self.image)
             if scatter is not None:
-                scatter.set_offsets(np.array([self.p_y, self.p_x]))
+                scatter.set_offsets(np.array([self.p_y, self.p_x]).T)
             if display_mode == 'quick':
                 # this is much faster, but doesn't work on all systems
                 fig.canvas.draw()
@@ -122,6 +123,11 @@ class PushBot3(object):
         return self.sensor['accel']
     def get_gyro(self):
         return self.sensor['gyro']
+    def get_touch(self):
+        return self.sensor['touch']
+
+    def set_touch(self, x):
+        self.sensor['touch'] = x
 
     def set_accel(self, data):
         x, y, z = data
@@ -166,6 +172,9 @@ class PushBot3(object):
                 elif msg.startswith('-S7 '):
                     x,y,z = msg[4:].split(' ')
                     self.set_gyro((int(x), int(y), int(z)))
+                elif msg.startswith('-S100 '):
+                    x = msg[6:]
+                    self.set_touch(int(x))
                 else:
                     pass
                     #print 'unknown msg', msg
@@ -262,8 +271,6 @@ class PushBot3(object):
 
 
 
-            #time = (time << 8) + data[5::packet_size]
-
             #print t
             index_on = (data[1::packet_size] & 0x80) > 0
             index_off = (data[1::packet_size] & 0x80) == 0
@@ -288,8 +295,8 @@ class PushBot3(object):
             for i, period in enumerate(self.track_periods):
                 eta = 0.2
                 t_exp = period
-                sigma_t = 100
-                sigma_p = 20
+                sigma_t = 100   # in microseconds
+                sigma_p = 30    # in pixels
                 t_diff = delta.astype(np.float) - t_exp
 
                 w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
@@ -298,11 +305,11 @@ class PushBot3(object):
                 #print w
                 #print t_diff[:5]
                 #print w_t[:5]
+                px = self.p_x[i]
+                py = self.p_y[i]
 
-                dist2 = (x - self.p_x[i])**2 + (y-self.p_y[i])**2
+                dist2 = (x - px)**2 + (y - py)**2
                 w_p = np.exp(-dist2/(2*sigma_p**2))
-
-                # haven't done w_p yet
 
                 # horrible heuristic for figuring out if we have good
                 # data by chekcing the proportion of events that are
@@ -310,23 +317,26 @@ class PushBot3(object):
                 #self.good_events[i] += (w_t>0.5).sum()
 
 
-
-                for j, w in enumerate(w_t * w_p):
-                    self.p_x[i] = (1-eta*w)*self.p_x[i] + eta*w*x[j]
-                    self.p_y[i] = (1-eta*w)*self.p_y[i] + eta*w*y[j]
+                for j, w in enumerate(eta * w_t * w_p):
+                    if w > 0.001:
+                        px += w * (x[j] - px)
+                        py += w * (y[j] - py)
+                self.p_x[i] = px
+                self.p_y[i] = py
 
                 '''
-
+                # faster, but less accurate method:
                 # update position estimate
                 try:
-                    r_x = np.average(x, weights=w_t)
-                    r_y = np.average(y, weights=w_t)
+                    r_x = np.average(x, weights=w_t*w_p)
+                    r_y = np.average(y, weights=w_t*w_p)
                     self.p_x[i] = (1-eta)*self.p_x[i] + (eta)*r_x
                     self.p_y[i] = (1-eta)*self.p_y[i] + (eta)*r_y
                 except ZeroDivisionError:
                     # occurs in np.average if weights sum to zero
                     pass
                 '''
+
             #print self.p_x, self.p_y
 
 
@@ -397,17 +407,17 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    #bot1 = PushBot3('10.162.177.49')
-    #bot1.laser(180)
-    #bot1.led(175)
+    #bot1 = PushBot3('10.162.177.55')
+    #bot1.laser(100)
+    #bot1.led(100)
 
-    bot = PushBot3('10.162.177.44')
+    bot = PushBot3('10.162.177.47')
     #bot = PushBot3('1,0,EAST')
     bot.activate_sensor('compass', freq=100)
     bot.activate_sensor('gyro', freq=100)
     bot.count_spikes(all=(0,0,128,128), left=(0,0,128,64), right=(0,64,128,128))
-    bot.laser(100)
-    bot.track_freqs([100])
+    bot.laser(200)
+    bot.track_freqs([200, 100])
     bot.show_image()
     import time
 
