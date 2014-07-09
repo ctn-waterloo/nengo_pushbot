@@ -9,18 +9,42 @@ spinnaker = False
 
 model = nengo.Network(label='pushbot')
 with model:
-    input = nengo.Node(lambda t: [0.5*np.sin(t), 0.5*np.cos(t)], label='input')
-    a = nengo.Ensemble(100, dimensions=2, label='a', radius=200)
+    def inv(x):
+        return -x[0]
+
+    # def sum_inp(x):
+    #     return x[0]+x[1]
 
     if spinnaker:
         bot = nengo_pushbot.PushBotNetwork('1,0,EAST')
     else:
-        bot = nengo_pushbot.PushBotNetwork('10.162.177.43')
-        bot.bot.show_image(decay=0.5)
+        #pass
+        bot = nengo_pushbot.PushBotNetwork('10.162.177.44')
+        #bot.bot.show_image(decay=0.5)
+    
+    kb_input = nengo.Node([0, 0, 0, 0], label='keyboard')
+    sum_left = nengo.Ensemble(100, dimensions=1, label='sum_left')
+    sum_right = nengo.Ensemble(100, dimensions=1, label='sum_right')
+    invert_pop = nengo.Ensemble(100, dimensions=1, label='invert')
+    left_drive = nengo.Ensemble(100, dimensions=1, label='left_drive')
+    right_drive = nengo.Ensemble(100, dimensions=1, label='right_drive')
 
-    nengo.Connection(input, a, synapse=None)
-    nengo.Connection(a, bot.motor, synapse=0.01, transform=0.1)
-    nengo.Probe(a)
+    # Get turn component
+    nengo.Connection(kb_input, invert_pop, function=inv)
+
+    # Get forward component
+    nengo.Connection(kb_input[2], sum_left)
+    nengo.Connection(invert_pop,  sum_left)
+    nengo.Connection(kb_input[2],  sum_right)
+    nengo.Connection(kb_input[3],  sum_right)
+
+    # Bind sums to output
+    nengo.Connection(sum_left, left_drive)
+    nengo.Connection(sum_right, right_drive)    
+
+    nengo.Connection(left_drive, bot.motor[0], synapse=0.01, transform=0.1)
+    nengo.Connection(right_drive, bot.motor[1], synapse=0.01, transform=0.1)
+    #nengo.Probe(a)
 
 
 if __name__ == '__main__':
@@ -41,32 +65,3 @@ if __name__ == '__main__':
     #jv.view()
 
     sim.run(5000)
-
-
-
-
-
-
-
-
-import nengo_gui
-gui = nengo_gui.Config()
-gui[model].scale = 1.2868750026997895
-gui[model].offset = 90.94158997498869,-26.8225001187908
-gui[a].pos = 175.000, 250.000
-gui[a].scale = 1.000
-gui[input].pos = 50.000, 250.000
-gui[input].scale = 1.000
-gui[bot].pos = 350.000, 250.000
-gui[bot].scale = 1.000
-gui[bot].size = 109.750, 412.000
-gui[bot.motor].pos = 350.000, 100.000
-gui[bot.motor].scale = 1.000
-gui[bot.accel].pos = 350.000, 175.000
-gui[bot.accel].scale = 1.000
-gui[bot.beep].pos = 350.000, 250.000
-gui[bot.beep].scale = 1.000
-gui[bot.compass].pos = 350.000, 325.000
-gui[bot.compass].scale = 1.000
-gui[bot.gyro].pos = 350.000, 400.000
-gui[bot.gyro].scale = 1.000
