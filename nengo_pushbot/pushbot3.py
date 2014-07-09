@@ -98,8 +98,9 @@ class PushBot3(object):
 
         while True:
             img.set_data(self.image)
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+            pylab.pause(0.001)
+            #fig.canvas.draw()
+            #fig.canvas.flush_events()
             self.image *= decay
 
     def get_compass(self):
