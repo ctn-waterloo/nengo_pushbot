@@ -407,9 +407,10 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    #bot1 = PushBot3('10.162.177.55')
-    #bot1.laser(100)
-    #bot1.led(100)
+    bot1 = PushBot3('10.162.177.55')
+    bot1.laser(100)
+    bot1.led(100)
+    1/0
 
     bot = PushBot3('10.162.177.47')
     #bot = PushBot3('1,0,EAST')

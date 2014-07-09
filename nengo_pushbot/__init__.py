@@ -12,8 +12,10 @@ from gyro import Gyro
 from accel import Accel
 from motor import Motor
 from beep import Beep
+from touch import Touch
 
 from countspikes import CountSpikes
+from tracker import Tracker
 
 import spinnaker
 
