@@ -28,7 +28,7 @@ class PushBot3(object):
         self.regions = None
         self.track_periods = None
         self.spinnaker_address = None
-        self.packet_size = 6
+        self.packet_size = 5
 
         self.laser_freq = None
         self.led_freq = None
@@ -68,9 +68,13 @@ class PushBot3(object):
         self.count_regions = {}
         for k,v in regions.items():
             self.count_regions[k] = [0, 0]
-    def track_freqs(self, freqs):
+    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3):
         freqs = np.array(freqs, dtype=float)
         self.track_periods = 500000/freqs
+
+        self.track_sigma_t = sigma_t
+        self.track_sigma_p = sigma_p
+        self.track_eta = eta
 
         self.last_on = np.zeros((128, 128), dtype=np.uint32)
         self.last_off = np.zeros((128, 128), dtype=np.uint32)
@@ -283,13 +287,13 @@ class PushBot3(object):
                              t - self.last_off[x, y],
                              t - self.last_on[x, y])
 
-            if self.delta is None:
-                self.delta = delta
-            else:
-                self.delta = np.hstack((self.delta, delta))
-
-            if len(self.delta) > 1000:
-                self.delta = self.delta[-1000:]
+            #if self.delta is None:
+            #    self.delta = delta
+            #else:
+            #    self.delta = np.hstack((self.delta, delta))
+            #
+            #if len(self.delta) > 1000:
+            #    self.delta = self.delta[-1000:]
 
             self.last_on[x[index_on],
                          y[index_on]] = t[index_on]
@@ -297,10 +301,10 @@ class PushBot3(object):
                           y[index_off]] = t[index_off]
 
             for i, period in enumerate(self.track_periods):
-                eta = 0.2
+                eta = self.track_eta
                 t_exp = period
-                sigma_t = 100   # in microseconds
-                sigma_p = 30    # in pixels
+                sigma_t = self.track_sigma_t    # in microseconds
+                sigma_p = self.track_sigma_p    # in pixels
                 t_diff = delta.astype(np.float) - t_exp
 
                 w_t = np.exp(-(t_diff**2)/(2*sigma_t**2))
@@ -417,8 +421,8 @@ class PushBot3(object):
 
 if __name__ == '__main__':
     bot1 = PushBot3('10.162.177.55')
-    bot1.laser(100)
-    bot1.led(100)
+    bot1.laser(200)
+    bot1.led(200)
     1/0
 
     bot = PushBot3('10.162.177.47')
