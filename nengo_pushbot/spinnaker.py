@@ -1,3 +1,5 @@
+import numpy as np
+
 from . import accel, beep, compass, gyro, motor
 
 try:
@@ -35,7 +37,8 @@ try:
             if isinstance(obj, (motor.Motor, beep.Beep)):
                 # Create a filter vertex between all incoming edges and the
                 # object
-                fv = nengo_spinnaker.builder.IntermediateFilter(obj.size_in)
+                fv = nengo_spinnaker.builder.IntermediateFilter(
+                    obj.size_in, transmission_period=100)
                 new_objs.append(fv)
 
                 in_conns = [c for c in conns if c.post is obj]
@@ -43,9 +46,7 @@ try:
                     c = nengo_spinnaker.utils.builder.IntermediateConnection.\
                         from_connection(c)
                     c.post = fv
-                    if isinstance(obj, motor.Motor):
-                        c.transform *= 100. / 2.**15  # Value to range +/- 100
-                    elif isinstance(obj, beep.Beep):
+                    if isinstance(obj, beep.Beep):
                         c.transform *= 1000. / 2.**15  # Value to mHz
                     new_conns.append(c)
 
@@ -69,16 +70,27 @@ try:
                         nengo_spinnaker.utils.builder.IntermediateConnection(
                             mc_vertex, pushbot_vertex,
                             keyspace=motor_keyspace(i=2, p=0, q=0, d=0)))
+                elif isinstance(obj, beep.Beep):
+                    # Ensure that the beep is switched off
+                    ks = pwm_keyspace(i=36, p=0)
+
+                    pushbot_vertex.end_packets.append(
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
+                                                                  0))
+                    new_conns.append(
+                        nengo_spinnaker.utils.builder.IntermediateConnection(
+                            mc_vertex, pushbot_vertex, keyspace=ks(d=0)))
 
                 # Create a new connection between the filter vertex and the
                 # pushbot
                 if isinstance(obj, motor.Motor):
                     c = nengo_spinnaker.utils.builder.IntermediateConnection(
                         fv, pushbot_vertex,
-                        keyspace=motor_keyspace(i=32, p=0, q=1))
+                        keyspace=motor_keyspace(i=32, p=0, q=1),
+                        transform=np.eye(2) * 100. / 2.**15)
                 elif isinstance(obj, beep.Beep):
                     c = nengo_spinnaker.utils.builder.IntermediateConnection(
-                        fv, pushbot_vertex, keyspace=pwm_keyspace())
+                        fv, pushbot_vertex, keyspace=pwm_keyspace(i=36, p=0))
                 new_conns.append(c)
 
             elif isinstance(obj, (accel.Accel, compass.Compass, gyro.Gyro)):
@@ -91,17 +103,17 @@ try:
                 # Add commands to enable appropriate sensors
                 ks = generic_robot_keyspace(i=1, f=1, d=1)
                 if isinstance(accel.Accel):
-                    pushbot_vertex.append(
+                    pushbot_vertex.start_packets.append(
                         nengo_spinnaker.assembler.MulticastPacket(0, ks,
                                                                   8 << 27 | 10)
                     )
                 elif isinstance(compass.Compass):
-                    pushbot_vertex.append(
+                    pushbot_vertex.start_packets.append(
                         nengo_spinnaker.assembler.MulticastPacket(0, ks,
                                                                   9 << 27 | 10)
                     )
                 elif isinstance(gyro.Gyro):
-                    pushbot_vertex.append(
+                    pushbot_vertex.start_packets.append(
                         nengo_spinnaker.assembler.MulticastPacket(0, ks,
                                                                   7 << 27 | 10)
                     )
@@ -163,6 +175,31 @@ try:
             setattr(bot, 'mc_vertex',
                     nengo_spinnaker.assembler.MulticastPlayer())
             objects.append(bot.mc_vertex)
+
+            # Set the LED or Laser frequencies
+            if bot.led_freq is not None and bot.led_freq > 0:
+                ks = pwm_keyspace(i=37, p=0, d=0)
+                bot.external_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(
+                        0, ks.key(), bot.led_freq * 1000.))
+                bot.external_vertex.end_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
+
+                connections.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        bot.mc_vertex, bot.external_vertex, keyspace=ks))
+
+            if bot.laser_freq is not None and bot.laser_freq > 0:
+                ks = pwm_keyspace(i=37, p=0, d=1)
+                bot.external_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(
+                        0, ks.key(), bot.laser_freq * 1000.))
+                bot.external_vertex.end_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
+
+                connections.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        bot.mc_vertex, bot.external_vertex, keyspace=ks))
 
         # Return a reference to the external vertex, the objects and the
         # connections
