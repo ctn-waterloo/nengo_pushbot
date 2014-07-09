@@ -1,3 +1,6 @@
+# orient to a particular direction
+# also plot the accelerometer data
+
 import nengo_pushbot
 import nengo
 

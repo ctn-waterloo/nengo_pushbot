@@ -1,3 +1,8 @@
+# control the motors of the robot
+# also contains code for connecting to SpiNNaker
+
+
+
 import nengo
 
 spinnaker = False

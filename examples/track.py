@@ -1,3 +1,6 @@
+# detect lights at different frequencies
+# if you see a dot too low, back up (otherwise go forward)
+
 import nengo_pushbot
 
 import nengo
@@ -6,7 +9,7 @@ model = nengo.Network()
 with model:
     bot = nengo_pushbot.PushBotNetwork('10.162.177.47')
     bot.track_freqs([200, 100])
-    bot.laser(0)
+    bot.laser(200)
     bot.show_image()
 
     pos0 = nengo.Ensemble(100, 2, label='pos0')
