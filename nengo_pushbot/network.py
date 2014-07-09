@@ -2,8 +2,10 @@ import nengo
 import nengo_pushbot
 
 class PushBotNetwork(nengo.Network):
-    def __init__(self, addr, port=56000):
-        self.bot = nengo_pushbot.PushBot3.get_bot(addr, port)
+    def __init__(self, addr, port=56000, message_delay=0.01, packet_size=5):
+        self.bot = nengo_pushbot.PushBot3.get_bot(addr, port,
+                                                  message_delay=message_delay,
+                                                  packet_size=packet_size)
         self.label = 'PushBot'
         self._motor = None
         self._beep = None

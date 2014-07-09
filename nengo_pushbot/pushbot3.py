@@ -16,19 +16,22 @@ class PushBot3(object):
     running_bots = {}
 
     @classmethod
-    def get_bot(cls, address, port=56000):
+    def get_bot(cls, address, port=56000, message_delay=0.01, packet_size=5):
         key = (address, port)
         if key not in PushBot3.running_bots:
-            PushBot3.running_bots[key] = PushBot3(address, port)
+            PushBot3.running_bots[key] = PushBot3(address, port,
+                                                  message_delay=message_delay,
+                                                  packet_size=packet_size)
         return PushBot3.running_bots[key]
 
 
-    def __init__(self, address, port=56000, message_delay=0.01):
+    def __init__(self, address, port=56000, message_delay=0.01, packet_size=5):
         self.image = None
         self.regions = None
         self.track_periods = None
         self.spinnaker_address = None
-        self.packet_size = 5
+        self.packet_size = packet_size
+        assert 4 <= packet_size <=6
 
         self.laser_freq = None
         self.led_freq = None
@@ -420,12 +423,11 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    bot1 = PushBot3('10.162.177.55')
-    bot1.laser(200)
-    bot1.led(200)
-    1/0
+    #bot1 = PushBot3('10.162.177.55')
+    #bot1.laser(200)
+    #bot1.led(200)
 
-    bot = PushBot3('10.162.177.47')
+    bot = PushBot3('10.162.177.49')
     #bot = PushBot3('1,0,EAST')
     bot.activate_sensor('compass', freq=100)
     bot.activate_sensor('gyro', freq=100)
