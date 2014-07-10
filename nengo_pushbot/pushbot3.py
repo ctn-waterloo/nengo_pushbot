@@ -107,7 +107,8 @@ class PushBot3(object):
         img = pylab.imshow(self.image, vmax=1, vmin=-1,
                                        interpolation='none', cmap='binary')
         if self.track_periods is not None:
-            scatter = pylab.scatter(self.p_y, self.p_x)
+            colors = (['b', 'g', 'r', 'c', 'm'] * 10)[:len(self.p_y)]
+            scatter = pylab.scatter(self.p_y, self.p_x, s=50, c=colors)
         else:
             scatter = None
 
