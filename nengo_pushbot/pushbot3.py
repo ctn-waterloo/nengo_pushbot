@@ -238,6 +238,7 @@ class PushBot3(object):
     delta = None
     last_t = None
     last_rt = 0
+    counter = 0
     def process_retina(self, data):
         packet_size = self.packet_size
         x = data[::packet_size] & 0x7f
@@ -292,26 +293,30 @@ class PushBot3(object):
             index_on = (data[1::packet_size] & 0x80) > 0
             index_off = (data[1::packet_size] & 0x80) == 0
 
-            delta = np.where(index_on,
-                             t - self.last_off[x, y],
-                             t - self.last_on[x, y])
+            #delta = np.where(index_on,
+            #                 t - self.last_off[x, y],
+            #                 t - self.last_on[x, y])
+            delta = np.where(index_on, t - self.last_on[x, y], 0)
 
+            #delta = t
             #if self.delta is None:
             #    self.delta = delta
             #else:
             #    self.delta = np.hstack((self.delta, delta))
-            #
+
             #if len(self.delta) > 1000:
             #    self.delta = self.delta[-1000:]
 
+
+
             self.last_on[x[index_on],
                          y[index_on]] = t[index_on]
-            self.last_off[x[index_off],
-                          y[index_off]] = t[index_off]
+            #self.last_off[x[index_off],
+            #              y[index_off]] = t[index_off]
 
             for i, period in enumerate(self.track_periods):
                 eta = self.track_eta
-                t_exp = period
+                t_exp = period * 2
                 sigma_t = self.track_sigma_t    # in microseconds
                 sigma_p = self.track_sigma_p    # in pixels
                 t_diff = delta.astype(np.float) - t_exp
@@ -335,7 +340,7 @@ class PushBot3(object):
 
 
                 for j, w in enumerate(eta * w_t * w_p):
-                    if w > 0.001:
+                    if w > 0.02:
                         px += w * (x[j] - px)
                         py += w * (y[j] - py)
                 self.p_x[i] = px
