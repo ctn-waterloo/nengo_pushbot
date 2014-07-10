@@ -79,5 +79,5 @@ docs/_build/*
 
 # Spurious dot/txt files
 *.dot
-spinnaker_components/*/nengo_*.txt
+spinnaker_components/*/*_*.txt
 *.swp
