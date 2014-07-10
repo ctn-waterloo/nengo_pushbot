@@ -255,15 +255,18 @@ class PushBot3(object):
 
                 old_count, old_time = self.count_regions[k]
 
-                dt = t - old_time
+                dt = float(t - old_time)
                 if dt < 0:
                     dt += 65536
+                count /= dt / 1000.0
 
                 decay = np.exp(-dt/tau)
-                new_count = old_count * decay + count * (1-decay)
+                new_count = old_count * (decay) + count * (1-decay)
 
                 self.count_regions[k] = new_count, t
-            #print {k:v[0] for k,v in self.count_regions.items()}
+            #if self.counter % 10 == 0:
+            #    print {k:v[0] for k,v in self.count_regions.items()}
+            #self.counter += 1
 
         if self.track_periods is not None:
             t = data[2::packet_size].astype(np.uint32)
