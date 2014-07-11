@@ -7,7 +7,19 @@ import thread
 
 
 display_mode = 'quick'
-
+rolling_average_time_window = 10 #number of samples in the rolling average window
+window_index = 0 #index into the window
+max0 = -65536
+min0 = 65536
+max1 = -65536
+min1 = 65536
+max2 = -65536
+min2 = 65536
+window0 = [None] * rolling_average_time_window
+window1 = [None] * rolling_average_time_window
+window2 = [None] * rolling_average_time_window
+decay = 0.00000001
+#decay = 0
 
 
 class PushBot3(object):
@@ -156,27 +168,77 @@ class PushBot3(object):
         self.sensor['gyro'] = float(x)/5000, float(y)/5000, float(z)/5000
 
     def set_compass(self, data):
+        
+        global min0, max0, min1, max1, min2, max2
+        global window_index, rolling_average_time_window
+        global window0, window1, window2
+        global decay
+        
         if data[0] == 0 and data[1] == 0 and data[2] == 0:
             # throw out invalid data
             return
 
-        #if self.compass_range is None:
-        #    self.compass_range = np.array([data, data], dtype=float)
-        #else:
-        #    for i in range(3):
-        #        self.compass_range[0][i] = max(data[i],
-        #                                       self.compass_range[0][i])
-        #        self.compass_range[1][i] = min(data[i],
-        #                                       self.compass_range[1][i])
+        
+        if window_index == 0:
+            min0 = data[0]
+            min1 = data[1]
+            min2 = data[2]
+            max0 = data[0]
+            max1 = data[1]
+            max2 = data[2]
+            averages = [0, 0, 0]
+            self.sensor['compass'] = averages
+            
+#        if data[0] < min0 - abs(0.1*min0):
+#            data[0] = min0 - abs(0.1*min0)
+#        if data[0] > max0 + abs(0.1*max0):
+#            data[0] = max0 + abs(0.1*max0)
+        min0 = min(min0, data[0])
+        max0 = max(max0, data[0])
+        
+#        if data[1] < min1 - abs(0.1*min1):
+#            data[1] = min1 - abs(0.1*min1)
+#        if data[1] > max1 + abs(0.1*max1):
+#            data[1] = max1 + abs(0.1*max1)
+        min1 = min(min1, data[1])
+        max1 = max(max1, data[1])
+        
+#        if data[2] < min2 - abs(0.1*min2):
+#            data[2] = min2 - abs(0.1*min2)
+#        if data[2] > max2 + abs(0.1*max2):
+#            data[2] = max2 + abs(0.1*max2)
+        min2 = min(min2, data[2])
+        max2 = max(max2, data[2])
 
-        self.compass_range = np.array([[-1310, 40, 1260], [-1650, -120, 1100]]).astype(float)
 
-        diff = self.compass_range[0] - self.compass_range[1]
-        value = [0, 0, 0]
-        for i in range(3):
-            if diff[i] > 0:
-                value[i] = ((data[i]-self.compass_range[1][i])/diff[i] - 0.5) *2
-        self.sensor['compass'] = value
+        #decay minimum and maximum
+        
+        window0[window_index % rolling_average_time_window] = data[0]
+        window1[window_index % rolling_average_time_window] = data[1]
+        window2[window_index % rolling_average_time_window] = data[2]
+        
+        fract = min(window_index+1, rolling_average_time_window)
+        if window_index != 0:
+            averages = [float(sum(filter(None, window0)))/float(fract), float(sum(filter(None, window1)))/float(fract), float(sum(filter(None, window2)))/float(fract)]
+            self.sensor['compass'] = [float(2*((averages[0]-min0)))/float(max0-min0)-1, float(2*((averages[1]-min1))/float(max1-min1))-1, float(2*((averages[2]-min2))/float(max2-min2))-1]
+            
+        min0 = min0 + decay*(max0 - min0)
+        max0 = max0 - decay*(max0 - min0)
+        min1 = min1 + decay*(max1 - min1)
+        max1 = max1 - decay*(max1 - min1)
+        min2 = min2 + decay*(max2 - min2)
+        max2 = max2 - decay*(max2 - min2)
+        window_index = window_index + 1
+#        print "0: ",min0, max0, data[0], averages[0], self.sensor['compass'][0]
+#        print "1: ",min1, max1, data[1], averages[1], self.sensor['compass'][1]
+#        print "2: ",min2, max2, data[2], averages[2], self.sensor['compass'][2]
+#        print self.sensor['compass']
+
+#        diff = self.compass_range[0] - self.compass_range[1]
+#        value = [0, 0, 0]
+#        for i in range(3):
+#            if diff[i] > 0:
+#                value[i] = ((data[i]-self.compass_range[1][i])/diff[i] - 0.5) *2
 
 
     def process_ascii(self, msg):
