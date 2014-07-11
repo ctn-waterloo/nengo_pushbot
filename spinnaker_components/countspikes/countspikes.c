@@ -17,8 +17,8 @@ spike_counter_system_t g_system;
 
 void mc_receive(uint key, uint payload) {
   // Get the x, y, polarity of the spike
-  uint x = (payload & 0x7fff0000) >> 16;
-  uint y = (payload & 0x0000ffff);
+  uint x = (payload & 0x0000ffff);
+  uint y = (payload & 0x7fff0000) >> 16;
   bool p = (payload & 0x80000000) >> 31;
 
   // If the spike is within the region we care about then increase the count
