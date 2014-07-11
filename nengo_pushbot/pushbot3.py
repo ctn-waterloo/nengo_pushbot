@@ -71,9 +71,11 @@ class PushBot3(object):
         self.count_regions = {}
         for k,v in regions.items():
             self.count_regions[k] = [0, 0]
-    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3):
+    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3,
+                                 certainty_scale=10000):
         freqs = np.array(freqs, dtype=float)
         self.track_periods = 500000/freqs
+        self.track_certainty_scale = certainty_scale
 
         self.track_sigma_t = sigma_t
         self.track_sigma_p = sigma_p
@@ -83,6 +85,7 @@ class PushBot3(object):
         self.last_off = np.zeros((128, 128), dtype=np.uint32)
         self.p_x = np.zeros_like(self.track_periods) + 64.0
         self.p_y = np.zeros_like(self.track_periods) + 64.0
+        self.track_certainty = np.zeros_like(self.track_periods)
         self.good_events = np.zeros_like(self.track_periods, dtype=int)
 
 
@@ -106,8 +109,9 @@ class PushBot3(object):
         pylab.ion()
         img = pylab.imshow(self.image, vmax=1, vmin=-1,
                                        interpolation='none', cmap='binary')
+
         if self.track_periods is not None:
-            colors = (['b', 'g', 'r', 'c', 'm'] * 10)[:len(self.p_y)]
+            colors = ([(0,0,1), (0,1,0), (1,0,0), (1,1,0), (1,0,1)] * 10)[:len(self.p_y)]
             scatter = pylab.scatter(self.p_y, self.p_x, s=50, c=colors)
         else:
             scatter = None
@@ -115,10 +119,13 @@ class PushBot3(object):
         while True:
             #fig.clear()
             #print self.track_periods
+            #pylab.plot(self.delta)
             #pylab.hist(self.delta, 50, range=(0000, 15000))
             img.set_data(self.image)
             if scatter is not None:
                 scatter.set_offsets(np.array([self.p_y, self.p_x]).T)
+                c = [(r,g,b,min(self.track_certainty[i],1)) for i,(r,g,b) in enumerate(colors)]
+                scatter.set_color(c)
             if display_mode == 'quick':
                 # this is much faster, but doesn't work on all systems
                 fig.canvas.draw()
@@ -152,14 +159,17 @@ class PushBot3(object):
         if data[0] == 0 and data[1] == 0 and data[2] == 0:
             # throw out invalid data
             return
-        if self.compass_range is None:
-            self.compass_range = np.array([data, data], dtype=float)
-        else:
-            for i in range(3):
-                self.compass_range[0][i] = max(data[i],
-                                               self.compass_range[0][i])
-                self.compass_range[1][i] = min(data[i],
-                                               self.compass_range[1][i])
+
+        #if self.compass_range is None:
+        #    self.compass_range = np.array([data, data], dtype=float)
+        #else:
+        #    for i in range(3):
+        #        self.compass_range[0][i] = max(data[i],
+        #                                       self.compass_range[0][i])
+        #        self.compass_range[1][i] = min(data[i],
+        #                                       self.compass_range[1][i])
+
+        self.compass_range = np.array([[-1310, 40, 1260], [-1650, -120, 1100]]).astype(float)
 
         diff = self.compass_range[0] - self.compass_range[1]
         value = [0, 0, 0]
@@ -215,6 +225,8 @@ class PushBot3(object):
                         stop_index = index + stop_index[0]
                     else:
                         stop_index = len(data)
+
+                    #print `data[offset+index:offset+stop_index]`
                     buffered_ascii += data[offset+index:offset+stop_index]
                     data_all = np.hstack((data_all[:index],
                                           data_all[stop_index:]))
@@ -239,10 +251,11 @@ class PushBot3(object):
     last_t = None
     last_rt = 0
     counter = 0
+    last_timestamp = None
     def process_retina(self, data):
         packet_size = self.packet_size
-        x = data[::packet_size] & 0x7f
-        y = data[1::packet_size] & 0x7f
+        x = data[::packet_size] & 0x7f    # actually y  TODO: swap this
+        y = data[1::packet_size] & 0x7f   # actually x
         if self.image is not None:
             value = np.where(data[1::packet_size]>=0x80, 1, -1)
             self.image[x, y] += value
@@ -250,7 +263,8 @@ class PushBot3(object):
             tau = 0.05 * 1000000
             for k, region in self.regions.items():
                 minx, miny, maxx, maxy = region
-                index = (minx <= x) & (x<maxx) & (miny <= y) & (y<maxy)
+                # TODO: fix this swapped x,y stuff
+                index = (minx <= y) & (y<maxx) & (miny <= x) & (x<maxy)
                 count = np.sum(index)
                 t = (int(data[-2]) << 8) + data[-1]
 
@@ -265,9 +279,9 @@ class PushBot3(object):
                 new_count = old_count * (decay) + count * (1-decay)
 
                 self.count_regions[k] = new_count, t
-            #if self.counter % 10 == 0:
-            #    print {k:v[0] for k,v in self.count_regions.items()}
-            #self.counter += 1
+            if self.counter % 10 == 0:
+                print {k:v[0] for k,v in self.count_regions.items()}
+            self.counter += 1
 
         if self.track_periods is not None:
             t = data[2::packet_size].astype(np.uint32)
@@ -276,6 +290,15 @@ class PushBot3(object):
                 t = (t << 8) + data[4::packet_size]
             if packet_size >=6:
                 t = (t << 8) + data[5::packet_size]
+
+            if self.last_timestamp is not None:
+                dt = float(t[-1]) - self.last_timestamp
+                if dt < 0:
+                    dt += 1 << (8 * (packet_size-2))
+            else:
+                dt = 1
+            self.last_timestamp = t[-1]
+
 
             #now = time.clock()
             #if self.last_t is None or now > self.last_t + 0.1:
@@ -314,6 +337,10 @@ class PushBot3(object):
             #self.last_off[x[index_off],
             #              y[index_off]] = t[index_off]
 
+            tau = 0.05 * 1000000
+            decay = np.exp(-dt/tau)
+            self.track_certainty *= decay
+
             for i, period in enumerate(self.track_periods):
                 eta = self.track_eta
                 t_exp = period * 2
@@ -333,13 +360,18 @@ class PushBot3(object):
                 dist2 = (x - px)**2 + (y - py)**2
                 w_p = np.exp(-dist2/(2*sigma_p**2))
 
+                ww = w_t * w_p
+                c = sum(ww) * self.track_certainty_scale / dt
+
+                self.track_certainty[i] += (1-decay) * c
+
                 # horrible heuristic for figuring out if we have good
                 # data by chekcing the proportion of events that are
                 # within sigma_t of desired period
                 #self.good_events[i] += (w_t>0.5).sum()
 
 
-                for j, w in enumerate(eta * w_t * w_p):
+                for j, w in enumerate(eta * ww):
                     if w > 0.02:
                         px += w * (x[j] - px)
                         py += w * (y[j] - py)
@@ -359,7 +391,7 @@ class PushBot3(object):
                     pass
                 '''
 
-            #print self.p_x, self.p_y
+            #print self.p_x, self.p_y, self.track_certainty
 
     def send(self, key, cmd, force):
         if self.socket is None:
@@ -434,17 +466,17 @@ class PushBot3(object):
 
 
 if __name__ == '__main__':
-    #bot1 = PushBot3('10.162.177.55')
+    #bot1 = PushBot3('10.162.177.135')
     #bot1.laser(200)
-    #bot1.led(200)
+    #bot1.led(100)
 
-    bot = PushBot3('10.162.177.49')
+    bot = PushBot3('10.162.177.43', packet_size=4)
     #bot = PushBot3('1,0,EAST')
-    bot.activate_sensor('compass', freq=100)
-    bot.activate_sensor('gyro', freq=100)
-    bot.count_spikes(all=(0,0,128,128), left=(0,0,128,64), right=(0,64,128,128))
-    bot.laser(200)
-    bot.track_freqs([200, 100])
+    #bot.activate_sensor('compass', freq=100)
+    #bot.activate_sensor('gyro', freq=100)
+    #bot.count_spikes(all=(0,0,128,128), left=(0,0,64,128), right=(64,0,128,128))
+    bot.laser(300)
+    bot.track_freqs([300, 200, 100], sigma_p=40)
     bot.show_image()
     import time
 
