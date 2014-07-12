@@ -9,24 +9,25 @@ try:
     import pacman103.front.common
 
     generic_robot_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'OutboundRobotProtocol', [('x', 1), ('o', 20), ('i', 7), ('f', 1),
-                                  ('d', 3)], 'xoi')(x=1, o=2**20-1)
+        'OutboundRobotProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
+                                  ('f', 1), ('d', 3)], 'xoi', 'xoi')(
+        x=1, o=2**19-1)
 
     motor_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
         'OutboundMotorProtocol',
-        [('x', 1), ('_', 20), ('i', 7), ('f', 1), ('p', 1), ('q', 1),
-         ('d', 1)], 'x_i')(x=1, _=2**20-1, f=0)
+        [('x', 1), ('_', 19), ('c', 1), ('i', 7), ('f', 1), ('p', 1), ('q', 1),
+         ('d', 1)], 'x_i', 'x_i')(x=1, _=2**19-1, f=0)
 
     pwm_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'OutboundPwmProtocol', [('x', 1), ('o', 20), ('i', 7), ('f', 1),
-                                ('p', 2), ('d', 1)],
-        'xoi')(x=1, o=2**20-1, f=0)
+        'OutboundPwmProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
+                                ('f', 1), ('p', 2), ('d', 1)],
+        'xoi', 'xoi')(x=1, o=2**19-1, f=0)
 
     # o for object (0xFEFFF8), i for ID (of UART), s for sensor, d for
     # dimension
     inbound_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
         'InboundRobotKeyspace', [('o', 21), ('i', 4), ('s', 5), ('d', 2)],
-        'ois')(o=0xFEFFF8 >> 3)
+        'ois', 'ois')(o=0xFEFFF8 >> 3)
 
     def prepare_pushbot(objs, conns, probes):
         new_objs = list()
@@ -104,12 +105,16 @@ try:
                 ks = generic_robot_keyspace(i=1, f=1, d=2)
                 if isinstance(obj, accel.Accel):
                     pushbot_vertex.start_packets.append(
-                        nengo_spinnaker.assembler.MulticastPacket(
-                            0, ks.key(), 8 << 27 | 100))
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
+                                                                  8 << 27 | 100
+                                                                  )
+                    )
                 elif isinstance(obj, gyro.Gyro):
                     pushbot_vertex.start_packets.append(
-                        nengo_spinnaker.assembler.MulticastPacket(
-                            0, ks.key(), 7 << 27 | 100))
+                        nengo_spinnaker.assembler.MulticastPacket(0, ks.key(),
+                                                                  7 << 27 | 100
+                                                                  )
+                    )
                 c = nengo_spinnaker.utils.builder.IntermediateConnection(
                     mc_vertex, pushbot_vertex, keyspace=ks)
                 new_conns.append(c)
