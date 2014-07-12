@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------------------
 # Code derived from Andrew Rowley, University of Manchester
 
-APPS = compass_calibrate
+APPS = compass_calibrate countspikes tracker
 APP_OUTPUT_DIR = $(PWD)/../nengo_pushbot/binaries
 COMPLETE_SOURCE = ./*/*.c ./*/*.h
 

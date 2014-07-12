@@ -1,6 +1,6 @@
 import numpy as np
 
-from . import accel, beep, compass, gyro, motor
+from . import accel, beep, compass, gyro, motor, tracker
 
 try:
     import nengo_spinnaker
@@ -28,6 +28,9 @@ try:
     inbound_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
         'InboundRobotKeyspace', [('o', 21), ('i', 4), ('s', 5), ('d', 2)],
         'ois', 'ois')(o=0xFEFFF8 >> 3)
+
+    retina_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
+        'InboundRetinaKeyspace', [('o', 17), ('e', 15)], 'o', 'o')
 
     def prepare_pushbot(objs, conns, probes):
         new_objs = list()
@@ -178,6 +181,49 @@ try:
                         from_connection(conn)
                     c.pre = cm
                     new_conns.append(c)
+
+            elif isinstance(obj, tracker.Tracker):
+                # Get the pushbot vertex and ensure that the sensor is enabled
+                pushbot_vertex, mc_vertex, new_objs, new_conns =\
+                    get_vertex(obj.bot, new_objs, new_conns)
+
+                # Turn on the retina
+                pushbot_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(
+                        0,
+                        generic_connection_keyspace(d=1),
+                        2 << 29 | 1 << 26
+                    )
+                )
+
+                # Set the retina key
+                pushbot_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(
+                        0,
+                        generic_connection_keyspace(d=2),
+                        0xFAFB << 16
+                    )
+                )
+
+                # Create a new TrackerVertex and add a connection from the
+                # eDVS to the TrackerVertex.
+                tracker_vertex = TrackerVertex(obj.frequency)
+                new_objs.append(tracker_vertex)
+
+                # Add a new connection from the pushbot vertex to the tracker
+                # vertex
+                new_conns.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        pusbot_vertex, tracker_vertex,
+                        keyspace=retina_keyspace(o=0xFAFB)))
+
+                # Replace all connections coming from the TrackerVertex
+                out_conns = [c for c in conns if c.pre is obj]
+                for c in out_conns:
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection.\
+                        from_connection(c)
+                    c.pre = tracker_vertex
+                    new_conns.append(c)
             else:
                 # Object is not a SpiNNaker->Robot or Robot->SpiNNaker
                 new_objs.append(obj)
@@ -185,8 +231,8 @@ try:
         # Add all remaining connections
         for c in conns:
             if not (isinstance(c.post, (motor.Motor, beep.Beep)) or
-                    isinstance(c.pre, (accel.Accel, compass.Compass, gyro.Gyro)
-                               )):
+                    isinstance(c.pre, (accel.Accel, compass.Compass, gyro.Gyro,
+                                       tracker.Tracker))):
                 new_conns.append(c)
 
         return new_objs, new_conns
@@ -274,16 +320,7 @@ try:
             return (subedge.edge.keyspace.routing_key(),
                     subedge.edge.keyspace.routing_mask)
 
-    class CompassVertex(nengo_spinnaker.utils.vertices.NengoVertex):
-        """Application to provide calibrated compass data."""
-        MODEL_NAME = 'pushbot_compass_calibrate'
-        MAX_ATOMS = 1
-        size_in = 3
-
-        def __init__(self):
-            super(CompassVertex, self).__init__(1)
-            self.regions = [None, None, None]
-
+    class SensorVertex(nengo_spinnaker.utils.vertices.NengoVertex):
         @classmethod
         def get_output_keys_region(cls, cv, assembler):
             output_keys = list()
@@ -306,12 +343,21 @@ try:
 
             transforms = np.vstack(t.transform for t in
                                    conns.transforms_functions)
-            print transforms
             transform_region =\
                 nengo_spinnaker.utils.vertices.UnpartitionedMatrixRegion(
                     transforms, formatter=nengo_spinnaker.utils.fp.bitsk)
 
             return transforms.shape[0], transform_region
+
+    class CompassVertex(SensorVertex):
+        """Application to provide calibrated compass data."""
+        MODEL_NAME = 'pushbot_compass_calibrate'
+        MAX_ATOMS = 1
+        size_in = 3
+
+        def __init__(self):
+            super(CompassVertex, self).__init__(1)
+            self.regions = [None, None, None]
 
         @classmethod
         def assemble(cls, cv, assembler):
@@ -329,6 +375,57 @@ try:
 
     nengo_spinnaker.assembler.Assembler.register_object_builder(
         CompassVertex.assemble, CompassVertex)
+
+    class TrackerVertex(SensorVertex):
+        def __init__(self, frequency, sigma_t=100, sigma_p=30, eta=0.3):
+            super(TrackerVertex, self).__init__(1)
+            # Create space for the regions
+            self.regions = [None] * 5
+
+            # Create the system region
+            t_exp = (1./frequency) * 10.0**6  # The expected delta t in usecs
+            system_items = [
+                nengo_spinnaker.utils.fp.bitsk(eta, n_bits=16, n_frac=16,
+                                               signed=False),
+                t_exp]
+
+            self.regions[0] = nengo_spinnaker.utils.vertices.\
+                UnpartitionedListRegion(system_items)
+
+            # Construct the Gaussians for time and space
+            t = np.arange(10*sigma_t).astype(float)
+            gaussian_time = nengo_spinnaker.utils.fp.bitsk(
+                np.exp(-t**2 / (2*sigma_t**2)), n_bits=16, n_frac=16,
+                signed=False)
+            gaussian_time.insert(0, len(gaussian_time))
+            gtr = nengo_spinnaker.utils.vertices.UnpartitionedListRegion(
+                gaussian_time, dtype='uint16')
+
+            s = np.arange(256).astype(float)
+            gaussian_space = nengo_spinnaker.utils.fp.bitsk(
+                np.exp(-s**2 / (2*sigma_p**2)), n_bits=16, n_frac=16,
+                signed=False)
+            gsr = nengo_spinnaker.utils.vertices.UnpartitionedListRegion(
+                gaussian_space, dtype='uint16')
+
+            # Assign the Gaussian region
+            self.regions[3] = gsr
+            self.regions[4] = gtr
+
+        @classmethod
+        def assemble(cls, tracker, assembler):
+            # Get the output keys and transform for the vertex
+            keys_region = cls.get_output_keys_region(tracker, assembler)
+            keys_region.data.insert(0, len(keys_region.data))
+            _, transform_region = cls.get_transform(tracker, assembler)
+
+            tracker.regions[1] = keys_region
+            tracker.regions[2] = transform_region
+
+            return tracker
+
+    nengo_spinnaker.assembler.Assembler.register_object_builder(
+        TrackerVertex.assemble, TrackerVertex)
 
 except ImportError:
     pass

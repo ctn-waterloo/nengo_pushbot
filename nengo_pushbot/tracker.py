@@ -1,9 +1,10 @@
 import nengo
 
 class Tracker(nengo.Node):
-    def __init__(self, bot, index):
+    def __init__(self, bot, index, frequency):
         self.bot = bot
         self.index = index
+        self.frequency = frequency
         super(Tracker, self).__init__(self.tracker_input, size_out=2,
                                      label='tracker_%d' % index)
 

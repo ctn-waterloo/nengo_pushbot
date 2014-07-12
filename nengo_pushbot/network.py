@@ -30,8 +30,8 @@ class PushBotNetwork(nengo.Network):
     def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3):
         self.bot.track_freqs(freqs, sigma_t=sigma_t, sigma_p=sigma_p, eta=eta)
         with self:
-            for i in range(len(freqs)):
-                node = nengo_pushbot.Tracker(self.bot, i)
+            for i, freq in enumerate(freqs):
+                node = nengo_pushbot.Tracker(self.bot, i, freq)
                 setattr(self, 'tracker_%d' % i, node)
 
     def show_image(self, decay=0.5):
