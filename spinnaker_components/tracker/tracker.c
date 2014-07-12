@@ -60,14 +60,20 @@ bool get_transforms(address_t addr) {
 }
 
 bool get_space_gaussian(address_t addr) {
-  spin1_memcpy(gaussian_space, addr, 256 * sizeof(value_t));
+  io_printf(IO_BUF, "Copying Gaussian.\n");
+  spin1_memcpy(gaussian_space, addr, 256 * sizeof(ushort));
+  io_printf(IO_BUF, "Copied Gaussian.\n");
   return true;
 }
 
 bool get_time_gaussian(address_t addr) {
-  MALLOC_FAIL_FALSE(gaussian_time, gaussian_time[0] * sizeof(value_t), "");
-  gaussian_time_length = gaussian_time[0];
-  spin1_memcpy(gaussian_time, addr, gaussian_time_length * sizeof(value_t));
+  io_printf(IO_BUF, "Allocating space for time Gaussian.\n");
+  gaussian_time_length = ((ushort*) addr)[0];
+  MALLOC_FAIL_FALSE(gaussian_time, gaussian_time_length * sizeof(ushort), "");
+  io_printf(IO_BUF, "Allocated space for time Gaussian.\n");
+  spin1_memcpy(gaussian_time, &((ushort*) addr)[1],
+               gaussian_time_length * sizeof(ushort));
+  io_printf(IO_BUF, "Copied time Gaussian.\n");
   return true;
 }
 
