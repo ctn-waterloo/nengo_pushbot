@@ -377,6 +377,9 @@ try:
         CompassVertex.assemble, CompassVertex)
 
     class TrackerVertex(SensorVertex):
+        MODEL_NAME = 'pushbot_tracker'
+        MAX_ATOMS = 1
+
         def __init__(self, frequency, sigma_t=100, sigma_p=30, eta=0.3):
             super(TrackerVertex, self).__init__(1)
             # Create space for the regions
