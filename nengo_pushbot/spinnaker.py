@@ -1,6 +1,6 @@
 import numpy as np
 
-from . import accel, beep, compass, gyro, motor
+from . import accel, beep, compass, countspikes, gyro, motor
 
 try:
     import nengo_spinnaker
@@ -178,6 +178,38 @@ try:
                         from_connection(conn)
                     c.pre = cm
                     new_conns.append(c)
+
+            elif isinstance(obj, countspikes.CountSpikes):
+                # Create the new CountSpikesVertex for the given region, add
+                # connections from the retina to the CountSpikesVertex and
+                # replace the origin on all relevant connections.
+                pushbot_vertex, mc_vertex, new_objs, new_conns =\
+                    get_vertex(obj.bot, new_objs, new_conns)
+
+                csv = CountSpikesVertex(obj.region)
+                new_objs.append(csv)
+
+                # Add a new connection from the pushbot to the csv
+                ks = inbound_keyspace(i=0, s=0, d=0)
+                new_conns.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        pushbot_vertex, csv, keyspace=ks))
+
+                # Replace all connections out of the CountSpikesVertex
+                out_conns = [c for c in conns if c.pre is obj]
+                for c in out_conns:
+                    c = nengo_spinnaker.utils.builder.IntermediateConnection.\
+                        from_connection(c)
+                    c.pre = csv
+                    new_conns.append(c)
+
+                # Add a new packet to the pushbot vertex to turn on the retina
+                ks = generic_robot_keyspace(i=0, f=0, d=1)
+                pushbot_vertex.start_packets.append(
+                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
+                new_conns.append(
+                    nengo_spinnaker.utils.builder.IntermediateConnection(
+                        mc_vertex, pushbot_vertex, keyspace=ks))
             else:
                 # Object is not a SpiNNaker->Robot or Robot->SpiNNaker
                 new_objs.append(obj)
@@ -185,8 +217,8 @@ try:
         # Add all remaining connections
         for c in conns:
             if not (isinstance(c.post, (motor.Motor, beep.Beep)) or
-                    isinstance(c.pre, (accel.Accel, compass.Compass, gyro.Gyro)
-                               )):
+                    isinstance(c.pre, (accel.Accel, compass.Compass, gyro.Gyro,
+                                       countspikes.CountSpikes))):
                 new_conns.append(c)
 
         return new_objs, new_conns
@@ -329,6 +361,50 @@ try:
 
     nengo_spinnaker.assembler.Assembler.register_object_builder(
         CompassVertex.assemble, CompassVertex)
+
+    class CountSpikesVertex(nengo_spinnaker.utils.vertices.NengoVertex):
+        MODEL_NAME = 'pushbot_countspikes'
+        MAX_ATOMS = 1
+        size_in = 0
+
+        def __init__(self, region):
+            super(CountSpikesVertex, self).__init__(1)
+            """Create a new CountSpikesVertex for the given region."""
+            self.region = region
+            self.regions = []
+
+        @classmethod
+        def assemble(cls, csv, assembler):
+            # Create the system region, the transforms region and the keys
+            # region.
+            system_region = nengo_spinnaker.utils.vertices.\
+                UnpartitionedListRegion(list(csv.region))
+
+            out_conns = nengo_spinnaker.utils.connections.Connections(
+                assembler.get_outgoing_connections(csv))
+            keys = list()
+            for c in out_conns:
+                for d in range(c.width):
+                    keys.append(c.keyspace.key(d=d))
+            keys.insert(0, len(keys))
+            keys_region = nengo_spinnaker.utils.vertices.\
+                UnpartitionedListRegion(keys)
+
+            transforms = np.hstack(c.transform.reshape(c.transform.size) for c
+                                   in out_conns).tolist()
+            transforms = [nengo_spinnaker.utils.fp.bitsk(t) for t in
+                          transforms]
+            transforms.insert(0, len(transforms))
+            transform_region = nengo_spinnaker.utils.vertices.\
+                UnpartitionedListRegion(transforms)
+
+            assert transforms[0] == keys[0]
+
+            csv.regions = [system_region, transform_region, keys_region]
+            return csv
+
+    nengo_spinnaker.assembler.Assembler.register_object_builder(
+        CountSpikesVertex.assemble, CountSpikesVertex)
 
 except ImportError:
     pass
