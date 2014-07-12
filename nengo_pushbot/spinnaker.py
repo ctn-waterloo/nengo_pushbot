@@ -30,7 +30,7 @@ try:
         'ois', 'ois')(o=0xFEFFF8 >> 3)
 
     retina_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'InboundRetinaKeyspace', [('o', 17), ('e', 15)], 'o', 'o')
+        'InboundRetinaKeyspace', [('o', 17), ('i', 15)], 'o', 'o')
 
     def prepare_pushbot(objs, conns, probes):
         new_objs = list()
@@ -191,7 +191,7 @@ try:
                 pushbot_vertex.start_packets.append(
                     nengo_spinnaker.assembler.MulticastPacket(
                         0,
-                        generic_connection_keyspace(d=1),
+                        generic_robot_keyspace(d=1).key(),
                         2 << 29 | 1 << 26
                     )
                 )
@@ -200,7 +200,7 @@ try:
                 pushbot_vertex.start_packets.append(
                     nengo_spinnaker.assembler.MulticastPacket(
                         0,
-                        generic_connection_keyspace(d=2),
+                        generic_robot_keyspace(d=2).key(),
                         0xFAFB << 16
                     )
                 )
@@ -214,7 +214,7 @@ try:
                 # vertex
                 new_conns.append(
                     nengo_spinnaker.utils.builder.IntermediateConnection(
-                        pusbot_vertex, tracker_vertex,
+                        pushbot_vertex, tracker_vertex,
                         keyspace=retina_keyspace(o=0xFAFB)))
 
                 # Replace all connections coming from the TrackerVertex
@@ -379,6 +379,8 @@ try:
     class TrackerVertex(SensorVertex):
         MODEL_NAME = 'pushbot_tracker'
         MAX_ATOMS = 1
+        size_in = 0
+        size_out = 3
 
         def __init__(self, frequency, sigma_t=100, sigma_p=30, eta=0.3):
             super(TrackerVertex, self).__init__(1)
@@ -421,6 +423,7 @@ try:
             keys_region = cls.get_output_keys_region(tracker, assembler)
             keys_region.data.insert(0, len(keys_region.data))
             _, transform_region = cls.get_transform(tracker, assembler)
+            keys_region.size += 1
 
             tracker.regions[1] = keys_region
             tracker.regions[2] = transform_region
