@@ -185,7 +185,7 @@ try:
                 new_objs.append(csv)
 
                 # Add a new connection from the pushbot to the csv
-                ks = inbound_keyspace(o=0xFAFB, i=0, s=0, d=0)
+                ks = inbound_keyspace(i=0, s=0, d=0)
                 new_conns.append(
                     nengo_spinnaker.utils.builder.IntermediateConnection(
                         pushbot_vertex, csv, keyspace=ks))
@@ -199,15 +199,9 @@ try:
                     new_conns.append(c)
 
                 # Add a new packet to the pushbot vertex to turn on the retina
-                ks = generic_robot_keyspace(i=0, f=0)
+                ks = generic_robot_keyspace(i=0, f=0, d=1)
                 pushbot_vertex.start_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(d=1),
-                                                              2 << 29 | 1 << 26
-                                                              ))
-                pushbot_vertex.start_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(d=2),
-                                                              0xFAFB << 16
-                                                              ))
+                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
                 new_conns.append(
                     nengo_spinnaker.utils.builder.IntermediateConnection(
                         mc_vertex, pushbot_vertex, keyspace=ks))
