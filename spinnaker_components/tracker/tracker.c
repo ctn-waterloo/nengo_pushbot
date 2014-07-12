@@ -24,9 +24,9 @@ void tick(uint ticks, uint arg1) {
 
   // Apply all output transforms and transmit packets
   for (uint j = 0; j < size_out; j++) {
-    g_filter.output[j] = 0;
-    for (uint k = 0; k < g_filter.size_in; k++)
-      output_values[j] += transforms[j*3 + k] * output_vals[3];
+    output_values[j] = 0;
+    for (uint k = 0; k < 3; k++)
+      output_values[j] += transforms[j*3 + k] * output_vals[k];
   }
   for (int i = 0; i < 3; i++) {
     spin1_send_mc_packet(keys[i], bitsk(output_values[i]), WITH_PAYLOAD);

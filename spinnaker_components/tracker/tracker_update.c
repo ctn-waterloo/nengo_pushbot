@@ -14,8 +14,7 @@ ushort t_exp;  //!< Expected time delta
 
 void spike_rx(uint key, uint payload) {
   // Get the x, y, p of the spike
-  uchar x, y;
-  bool p;
+  uchar x, y, p;
   x = (key & (0x7f << 7)) >> 7;
   y = key & 0x7f;
   p = key & 0x8000 >> 15;
