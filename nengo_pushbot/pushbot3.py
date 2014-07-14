@@ -168,17 +168,17 @@ class PushBot3(object):
         self.sensor['gyro'] = float(x)/5000, float(y)/5000, float(z)/5000
 
     def set_compass(self, data):
-        
+
         global min0, max0, min1, max1, min2, max2
         global window_index, rolling_average_time_window
         global window0, window1, window2
         global decay
-        
+
         if data[0] == 0 and data[1] == 0 and data[2] == 0:
             # throw out invalid data
             return
 
-        
+
         if window_index == 0:
             min0 = data[0]
             min1 = data[1]
@@ -188,21 +188,21 @@ class PushBot3(object):
             max2 = data[2]
             averages = [0, 0, 0]
             self.sensor['compass'] = averages
-            
+
 #        if data[0] < min0 - abs(0.1*min0):
 #            data[0] = min0 - abs(0.1*min0)
 #        if data[0] > max0 + abs(0.1*max0):
 #            data[0] = max0 + abs(0.1*max0)
         min0 = min(min0, data[0])
         max0 = max(max0, data[0])
-        
+
 #        if data[1] < min1 - abs(0.1*min1):
 #            data[1] = min1 - abs(0.1*min1)
 #        if data[1] > max1 + abs(0.1*max1):
 #            data[1] = max1 + abs(0.1*max1)
         min1 = min(min1, data[1])
         max1 = max(max1, data[1])
-        
+
 #        if data[2] < min2 - abs(0.1*min2):
 #            data[2] = min2 - abs(0.1*min2)
 #        if data[2] > max2 + abs(0.1*max2):
@@ -212,16 +212,16 @@ class PushBot3(object):
 
 
         #decay minimum and maximum
-        
+
         window0[window_index % rolling_average_time_window] = data[0]
         window1[window_index % rolling_average_time_window] = data[1]
         window2[window_index % rolling_average_time_window] = data[2]
-        
+
         fract = min(window_index+1, rolling_average_time_window)
         if window_index != 0:
             averages = [float(sum(filter(None, window0)))/float(fract), float(sum(filter(None, window1)))/float(fract), float(sum(filter(None, window2)))/float(fract)]
             self.sensor['compass'] = [float(2*((averages[0]-min0)))/float(max0-min0)-1, float(2*((averages[1]-min1))/float(max1-min1))-1, float(2*((averages[2]-min2))/float(max2-min2))-1]
-            
+
         min0 = min0 + decay*(max0 - min0)
         max0 = max0 - decay*(max0 - min0)
         min1 = min1 + decay*(max1 - min1)
@@ -512,7 +512,8 @@ class PushBot3(object):
             if freq <= 0:
                 cmd = '!PC=0\n!PC0=0\n!PC1=0'
             else:
-                cmd = '!PC=%d\n!PC0=%%50\n!PC1=%%50' % int(1000000/freq)
+                cmd = '!PC=%d\n!PC0=%d\n!PC1=%d\n' % (int(1000000/freq),
+                        int(500000/freq), int(500000/freq))
             self.send('led', cmd, force)
         else:
             self.led_freq = freq

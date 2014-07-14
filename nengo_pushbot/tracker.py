@@ -11,6 +11,6 @@ class Tracker(nengo.Node):
         if self.bot is not None:
             return (self.bot.p_x[self.index]/64.0 - 1,
                     self.bot.p_y[self.index]/64.0 - 1,
-                    self.bot.track_certainty[self.index])
+                    min(self.bot.track_certainty[self.index], 1.0))
         else:
             return [0, 0, 0]

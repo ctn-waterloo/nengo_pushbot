@@ -23,12 +23,14 @@ class PushBotNetwork(nengo.Network):
     def count_spikes(self, **regions):
         self.bot.count_spikes(**regions)
         with self:
-            for k in regions.keys():
-                node = nengo_pushbot.CountSpikes(self.bot, k)
+            for (k, r) in regions.items():
+                node = nengo_pushbot.CountSpikes(self.bot, k, r)
                 setattr(self, 'count_%s' % k, node)
 
-    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3):
-        self.bot.track_freqs(freqs, sigma_t=sigma_t, sigma_p=sigma_p, eta=eta)
+    def track_freqs(self, freqs, sigma_t=100, sigma_p=30, eta=0.3,
+                                 certainty_scale=10000):
+        self.bot.track_freqs(freqs, sigma_t=sigma_t, sigma_p=sigma_p, eta=eta,
+                                    certainty_scale=certainty_scale)
         with self:
             for i in range(len(freqs)):
                 node = nengo_pushbot.Tracker(self.bot, i)
