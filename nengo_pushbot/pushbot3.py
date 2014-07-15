@@ -23,7 +23,7 @@ decay = 0.00000001
 
 
 class PushBot3(object):
-    sensors = dict(compass=512, accel=256, gyro=128)
+    sensors = dict(compass=512, accel=256, gyro=128, bat= 1)
 
     running_bots = {}
 
@@ -72,8 +72,8 @@ class PushBot3(object):
         self.ticks = 0
         self.vertex = None
 
-        self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0],
-                           touch=0)
+        self.sensor = dict(compass=[0,0,0], accel=[0,0,0],
+                           gyro=[0,0,0], bat=[5000], touch=0)
         self.compass_range = None
 
         thread.start_new_thread(self.sensor_loop, ())
@@ -151,8 +151,13 @@ class PushBot3(object):
         return self.sensor['compass']
     def get_accel(self):
         return self.sensor['accel']
+
     def get_gyro(self):
         return self.sensor['gyro']
+
+    def get_bat(self):
+        return self.sensor['bat']
+
     def get_touch(self):
         return self.sensor['touch']
 
@@ -162,6 +167,11 @@ class PushBot3(object):
     def set_accel(self, data):
         x, y, z = data
         self.sensor['accel'] = float(x)/10000, float(y)/10000, float(z)/10000
+
+    def set_bat(self, data):
+        x = data
+        self.sensor['bat'] = float(x)
+        #print(x)
 
     def set_gyro(self, data):
         x, y, z = data
@@ -252,6 +262,9 @@ class PushBot3(object):
                 elif msg.startswith('-S8 '):
                     x,y,z = msg[4:].split(' ')
                     self.set_accel((int(x), int(y), int(z)))
+                elif msg.startswith('-S0 '):
+                    x = msg[4:]
+                    self.set_bat(int(x))
                 elif msg.startswith('-S7 '):
                     x,y,z = msg[4:].split(' ')
                     self.set_gyro((int(x), int(y), int(z)))
@@ -538,6 +551,8 @@ if __name__ == '__main__':
     #bot.activate_sensor('compass', freq=100)
     #bot.activate_sensor('gyro', freq=100)
     #bot.count_spikes(all=(0,0,128,128), left=(0,0,64,128), right=(64,0,128,128))
+    #bot.activate_sensor('bat', freq=100)
+
     bot.laser(300)
     bot.track_freqs([300, 200, 100], sigma_p=40)
     bot.show_image()
