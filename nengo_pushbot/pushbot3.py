@@ -502,6 +502,19 @@ class PushBot3(object):
             cmd = '!MVD0=%d\n!MVD1=%d\n' % (left, right)
             self.send('motor', cmd, force)
 
+    def omni_motor(self, x, y, r, force=False):
+        a = 0*x    -  1.0*y  + 1.0*r
+        b = 0.8*x  +  0.45*y  + 1.0*r
+        c = 0.8*x  -  0.45*y  - 1.0*r
+        a = int(a * 100)
+        b = int(b * 100)
+        c = int(c * 100)
+        a = min(max(a, -100), 100)
+        b = min(max(b, -100), 100)
+        c = min(max(c, -100), 100)
+        cmd = '!MVD0=%d\n!MVD1=%d\n!MVD2=%d' % (a, b, c)
+        self.send('motor', cmd, force)
+
     def beep(self, freq, force=False):
         if freq <= 0:
             cmd = '!PB=0\n!PB0=0\n'
@@ -546,18 +559,19 @@ if __name__ == '__main__':
     #bot1.laser(200)
     #bot1.led(100)
 
-    bot = PushBot3('10.162.177.43', packet_size=4)
+    bot = PushBot3('10.128.0.17', packet_size=4)
     #bot = PushBot3('1,0,EAST')
     #bot.activate_sensor('compass', freq=100)
     #bot.activate_sensor('gyro', freq=100)
     #bot.count_spikes(all=(0,0,128,128), left=(0,0,64,128), right=(64,0,128,128))
     #bot.activate_sensor('bat', freq=100)
 
-    bot.laser(300)
-    bot.track_freqs([300, 200, 100], sigma_p=40)
-    bot.show_image()
-    import time
+    #bot.laser(300)
+    #bot.track_freqs([300, 200, 100], sigma_p=40)
+    #bot.show_image()
+    #import time
 
     while True:
-        time.sleep(1)
+        bot.omni_motor(0, 1, 0)
+        time.sleep(0.1)
 
