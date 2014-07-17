@@ -23,7 +23,7 @@ decay = 0.00000001
 
 
 class PushBot3(object):
-    sensors = dict(compass=512, accel=256, gyro=128)
+    sensors = dict(compass=512, accel=256, gyro=128, bat= 1)
 
     running_bots = {}
 
@@ -72,8 +72,8 @@ class PushBot3(object):
         self.ticks = 0
         self.vertex = None
 
-        self.sensor = dict(compass=[0,0,0], accel=[0,0,0], gyro=[0,0,0],
-                           touch=0)
+        self.sensor = dict(compass=[0,0,0], accel=[0,0,0],
+                           gyro=[0,0,0], bat=[5000], touch=0)
         self.compass_range = None
 
         thread.start_new_thread(self.sensor_loop, ())
@@ -151,8 +151,13 @@ class PushBot3(object):
         return self.sensor['compass']
     def get_accel(self):
         return self.sensor['accel']
+
     def get_gyro(self):
         return self.sensor['gyro']
+
+    def get_bat(self):
+        return self.sensor['bat']
+
     def get_touch(self):
         return self.sensor['touch']
 
@@ -162,6 +167,11 @@ class PushBot3(object):
     def set_accel(self, data):
         x, y, z = data
         self.sensor['accel'] = float(x)/10000, float(y)/10000, float(z)/10000
+
+    def set_bat(self, data):
+        x = data
+        self.sensor['bat'] = float(x)
+        #print(x)
 
     def set_gyro(self, data):
         x, y, z = data
@@ -252,6 +262,9 @@ class PushBot3(object):
                 elif msg.startswith('-S8 '):
                     x,y,z = msg[4:].split(' ')
                     self.set_accel((int(x), int(y), int(z)))
+                elif msg.startswith('-S0 '):
+                    x = msg[4:]
+                    self.set_bat(int(x))
                 elif msg.startswith('-S7 '):
                     x,y,z = msg[4:].split(' ')
                     self.set_gyro((int(x), int(y), int(z)))
@@ -489,6 +502,19 @@ class PushBot3(object):
             cmd = '!MVD0=%d\n!MVD1=%d\n' % (left, right)
             self.send('motor', cmd, force)
 
+    def omni_motor(self, x, y, r, force=False):
+        a = 0*x    -  1.0*y  + 1.0*r
+        b = 0.8*x  +  0.45*y  + 1.0*r
+        c = 0.8*x  -  0.45*y  - 1.0*r
+        a = int(a * 100)
+        b = int(b * 100)
+        c = int(c * 100)
+        a = min(max(a, -100), 100)
+        b = min(max(b, -100), 100)
+        c = min(max(c, -100), 100)
+        cmd = '!MVD0=%d\n!MVD1=%d\n!MVD2=%d' % (a, b, c)
+        self.send('motor', cmd, force)
+
     def beep(self, freq, force=False):
         if freq <= 0:
             cmd = '!PB=0\n!PB0=0\n'
@@ -533,16 +559,19 @@ if __name__ == '__main__':
     #bot1.laser(200)
     #bot1.led(100)
 
-    bot = PushBot3('10.162.177.43', packet_size=4)
+    bot = PushBot3('10.128.0.17', packet_size=4)
     #bot = PushBot3('1,0,EAST')
     #bot.activate_sensor('compass', freq=100)
     #bot.activate_sensor('gyro', freq=100)
     #bot.count_spikes(all=(0,0,128,128), left=(0,0,64,128), right=(64,0,128,128))
-    bot.laser(300)
-    bot.track_freqs([300, 200, 100], sigma_p=40)
-    bot.show_image()
-    import time
+    #bot.activate_sensor('bat', freq=100)
+
+    #bot.laser(300)
+    #bot.track_freqs([300, 200, 100], sigma_p=40)
+    #bot.show_image()
+    #import time
 
     while True:
-        time.sleep(1)
+        bot.omni_motor(0, 1, 0)
+        time.sleep(0.1)
 
