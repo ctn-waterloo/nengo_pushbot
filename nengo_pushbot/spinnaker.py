@@ -8,27 +8,6 @@ try:
     import nengo_spinnaker.builder
     import pacman103.front.common
 
-    generic_robot_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'OutboundRobotProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
-                                  ('f', 1), ('d', 3)], 'xoi', 'xoi')(
-        x=1, o=2**19-1)
-
-    motor_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'OutboundMotorProtocol',
-        [('x', 1), ('_', 19), ('c', 1), ('i', 7), ('f', 1), ('p', 1), ('q', 1),
-         ('d', 1)], 'x_i', 'x_i')(x=1, _=2**19-1, f=0)
-
-    pwm_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'OutboundPwmProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
-                                ('f', 1), ('p', 2), ('d', 1)],
-        'xoi', 'xoi')(x=1, o=2**19-1, f=0)
-
-    # o for object (0xFEFFF8), i for ID (of UART), s for sensor, d for
-    # dimension
-    inbound_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
-        'InboundRobotKeyspace', [('o', 21), ('i', 4), ('s', 5), ('d', 2)],
-        'ois', 'ois')(o=0xFEFFF8 >> 3)
-
     def prepare_pushbot(objs, conns, probes):
         new_objs = list()
         new_conns = list()
@@ -100,6 +79,7 @@ try:
                 # the objects
                 pushbot_vertex, mc_vertex, new_objs, new_conns =\
                     get_vertex(obj.bot, new_objs, new_conns)
+
 
                 # Add commands to enable appropriate sensors
                 ks = generic_robot_keyspace(i=1, f=1, d=2)
@@ -226,85 +206,7 @@ try:
     nengo_spinnaker.builder.Builder.register_connectivity_transform(
         prepare_pushbot)
 
-    def get_vertex(bot, objects, connections):
-        """Return the vertex for the robot, and an amended set of objects and
-        connections.
-        """
-        objects = list(objects)
-        connections = list(connections)
 
-        edge_dirs = {'EAST': 0, 'NORTH EAST': 1, 'NORTH': 2, 'WEST': 3,
-                     'SOUTH WEST': 4, 'SOUTH': 5}
-
-        if not hasattr(bot, 'external_vertex'):
-            # Create the external vertex
-            setattr(bot, 'external_vertex', PushBotVertex(
-                connected_node_coords=dict(
-                    x=bot.spinnaker_address[0],
-                    y=bot.spinnaker_address[1]),
-                connected_node_edge=edge_dirs[bot.spinnaker_address[2]]))
-            objects.append(bot.external_vertex)
-
-            # Create a link between the multicast vertex and the pushbot
-            # vertex to turn various components on
-            setattr(bot, 'mc_vertex',
-                    nengo_spinnaker.assembler.MulticastPlayer())
-            objects.append(bot.mc_vertex)
-
-            # Set the LED or Laser frequencies
-            if bot.led_freq is not None and bot.led_freq > 0:
-                ks = pwm_keyspace(i=37, p=0, d=0)
-                bot.external_vertex.start_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(
-                        0, ks.key(), bot.led_freq * 1000.))
-                bot.external_vertex.end_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
-
-                connections.append(
-                    nengo_spinnaker.utils.builder.IntermediateConnection(
-                        bot.mc_vertex, bot.external_vertex, keyspace=ks))
-
-            if bot.laser_freq is not None and bot.laser_freq > 0:
-                ks = pwm_keyspace(i=37, p=0, d=1)
-                bot.external_vertex.start_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(
-                        0, ks.key(), bot.laser_freq * 1000.))
-                bot.external_vertex.end_packets.append(
-                    nengo_spinnaker.assembler.MulticastPacket(0, ks.key(), 0))
-
-                connections.append(
-                    nengo_spinnaker.utils.builder.IntermediateConnection(
-                        bot.mc_vertex, bot.external_vertex, keyspace=ks))
-
-        # Return a reference to the external vertex, the objects and the
-        # connections
-        return bot.external_vertex, bot.mc_vertex, objects, connections
-
-    class PushBotVertex(pacman103.front.common.ExternalDeviceVertex):
-        model_name = "nengo_pushbot"
-        size_in = 2
-
-        def __init__(self,
-                     virtual_chip_coords=dict(x=0xFE, y=0xFF),
-                     connected_node_coords=dict(x=1, y=0),
-                     connected_node_edge=pacman103.front.common.edges.EAST,
-                     index=0):
-            super(PushBotVertex, self).__init__(
-                n_neurons=0, virtual_chip_coords=virtual_chip_coords,
-                connected_node_coords=connected_node_coords,
-                connected_node_edge=connected_node_edge
-            )
-            self.start_packets = [nengo_spinnaker.assembler.MulticastPacket(
-                0, generic_robot_keyspace(i=0, f=0, d=7).key(), 0)
-            ]
-            self.end_packets = [nengo_spinnaker.assembler.MulticastPacket(
-                0, generic_robot_keyspace(i=1, f=0, d=0).key(), 0)
-            ]
-            self.index = index
-
-        def generate_routing_info(self, subedge):
-            return (subedge.edge.keyspace.routing_key(),
-                    subedge.edge.keyspace.routing_mask)
 
     class CompassVertex(nengo_spinnaker.utils.vertices.NengoVertex):
         """Application to provide calibrated compass data."""
