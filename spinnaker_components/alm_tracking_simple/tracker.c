@@ -1,7 +1,6 @@
 #include "tracker.h"
 
 tracker_t g_tracker;
-uint count;
 
 void retina_update(uint key, uint timestamp);
 bool provide_debug_values();
@@ -14,10 +13,6 @@ void mcpl_received(uint key, uint payload)
     return;
 
   spin1_schedule_callback(retina_update, key, payload, 1);
-
-#ifdef DEBUG_RETINA
-  count++;
-#endif
 }
 
 /** Process retina spike */
@@ -51,6 +46,14 @@ void retina_update(uint key, uint timestamp)
                                 g_tracker.w_p[p_delta]);
   g_tracker.x = (1k - _p)*g_tracker.x + _p*ex;
   g_tracker.y = (1k - _p)*g_tracker.y + _p*ey;
+
+  // Modify the confidence
+  g_tracker.count++;
+
+  if (g_tracker.w_t[t_delta] > 0.5k && g_tracker.w_p[p_delta] > 0.5k)
+  {
+    g_tracker.good_events++;
+  }
 }
 
 /** Output current estimate */
@@ -59,15 +62,27 @@ void tick(uint ticks, uint arg1)
   use(ticks);
   use(arg1);
 
+  // Calculate the confidence
+  value_t confidence;
+  if (g_tracker.count == 0 || g_tracker.good_events == 0)
+  {
+    confidence = 0k;
+  }
+  else
+  {
+    confidence = ((value_t)g_tracker.good_events) / ((value_t)g_tracker.count);
+  }
+
 #ifndef DEBUG_RETINA
   // Transmit multicast packet
 #else
   // Output to IO_STD
-  io_printf(IO_STD, "x = %.3k, y=%.3k, c=%d\n",
-            g_tracker.x, g_tracker.y, count);
-
-  count = 0;
+  io_printf(IO_STD, "x = %.3k, y=%.3k, c=%.3k\n",
+            g_tracker.x, g_tracker.y, confidence);
 #endif
+
+  g_tracker.good_events = 0;
+  g_tracker.count = 0;
 }
 
 void c_main(void)
@@ -86,6 +101,8 @@ void c_main(void)
       g_tracker.last_spikes[i*Y_RESOLUTION + j] = 0;
     }
   }
+
+  g_tracker.count = g_tracker.good_events = 0;
 
 #ifndef DEBUG_RETINA
 

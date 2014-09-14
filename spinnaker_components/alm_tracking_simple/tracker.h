@@ -39,7 +39,9 @@ static inline uint abs(int val)
 
 /* System state for the tracker */
 typedef struct _tracker_t {
-  value_t x, y;  //!< Current estimates of position
+  value_t x, y;     //!< Current estimates of position
+  uint good_events; //!< Horrible metric of confidence from Python code
+  uint count;       //!< Count of events for the current time period
 
   uint* last_spikes;  //!< Last spikes at pixels
   uint  t_exp;        //!< Expected period us
