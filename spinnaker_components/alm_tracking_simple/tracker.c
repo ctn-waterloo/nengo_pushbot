@@ -75,6 +75,8 @@ void tick(uint ticks, uint arg1)
 
 #ifndef DEBUG_RETINA
   // Transmit multicast packet
+
+  // Apply the output transform
 #else
   // Output to IO_STD
   io_printf(IO_STD, "x = %.3k, y=%.3k, c=%.3k\n",
@@ -105,7 +107,40 @@ void c_main(void)
   g_tracker.count = g_tracker.good_events = 0;
 
 #ifndef DEBUG_RETINA
+  address_t address = system_load_sram();
+  if (leadAp)
+  {
+    system_lead_app_configured();
+  }
 
+  // Load in the position delta Gaussian
+  g_tracker.w_p = spin1_malloc((X_RESOLUTION + Y_RESOLUTION)*sizeof(value_t));
+  if (g_tracker.w_p == NULL)
+  {
+    debug("Failed to malloc space for g_tracker.w_p.");
+    return;
+  }
+  spin1_memcpy(g_tracker.w_p, region_start(2, address),
+               (X_RESOLUTION + Y_RESOLUTION)*sizeof(value_t));
+
+  // Load in the time delta Gaussian
+  system_region_t* sys_region = (system_region_t*) region_start(1, address);
+  g_tracker.w_t_max = sys_region->w_t_max;
+  g_tracker.w_t = spin1_malloc(sys_region->w_t_max * sizeof(value_t));
+  if (g_tracker.w_t == NULL)
+  {
+    debug("Failed to malloc space for g_tracker.w_t.");
+    return;
+  }
+  spin1_memcpy(g_tracker.w_t, region_start(3, address),
+               sys_region->w_t_max * sizeof(value_t));
+
+  // Set the t_exp and eta values
+  g_tracker.t_exp = sys_region->t_exp;
+  g_tracker.eta = sys_region->eta;
+
+  spin1_set_timer_tick(1000);
+  spin1_start(SYNC_WAIT);
 #else
   debug("Setting up dummy routes.");
   // Set up routes to/from the retina

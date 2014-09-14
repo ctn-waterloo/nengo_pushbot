@@ -18,7 +18,7 @@
  *
  * View the output (x, y) estimate using Tubotron or similar.
  */
-#define DEBUG_RETINA true
+// #define DEBUG_RETINA true
 
 // Defines for resolution, etc.
 // Downsampling to 64x64 to save memory, eventually could use DMA to store
@@ -51,3 +51,11 @@ typedef struct _tracker_t {
   value_t* w_p;  //!< Weighting for position delta
   value_t  eta;  //!< eta weighting factor
 } tracker_t;
+
+
+/* Layout of system region */
+typedef struct _system_region_t {
+  uint32_t t_exp;
+  uint32_t w_t_max;
+  value_t eta;
+} system_region_t;
