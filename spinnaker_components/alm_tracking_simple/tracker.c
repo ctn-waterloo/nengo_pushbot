@@ -89,11 +89,6 @@ void tick(uint ticks, uint arg1)
 
 void c_main(void)
 {
-  // Initialise the callbacks for spike events and timer ticks
-  debug("Setting up callbacks.");
-  spin1_callback_on(MCPL_PACKET_RECEIVED, mcpl_received, -1);
-  spin1_callback_on(TIMER_TICK, tick, 2);
-
   // Initialise the last used times
   debug("Zeroing last spike tracker.");
   g_tracker.last_spikes = spin1_malloc(
@@ -139,6 +134,11 @@ void c_main(void)
   g_tracker.t_exp = sys_region->t_exp;
   g_tracker.eta = sys_region->eta;
 
+  // Initialise the callbacks for spike events and timer ticks
+  debug("Setting up callbacks.");
+  spin1_callback_on(MCPL_PACKET_RECEIVED, mcpl_received, -1);
+  spin1_callback_on(TIMER_TICK, tick, 2);
+
   spin1_set_timer_tick(1000);
   spin1_start(SYNC_WAIT);
 #else
@@ -154,9 +154,14 @@ void c_main(void)
   // Provide sample values for important settings
   debug("Providing sample data values.");
   g_tracker.eta = 0.3k;
-  g_tracker.t_exp = 1000;
+  g_tracker.t_exp = 746;
   if (!provide_debug_values())
     return;
+
+  // Initialise the callbacks for spike events and timer ticks
+  debug("Setting up callbacks.");
+  spin1_callback_on(MCPL_PACKET_RECEIVED, mcpl_received, -1);
+  spin1_callback_on(TIMER_TICK, tick, 2);
 
   // Start
   spin1_set_timer_tick(1000);
