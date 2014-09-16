@@ -9,17 +9,17 @@ import pacman103.front.common
 generic_robot_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
     'OutboundRobotProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
                               ('f', 1), ('d', 3)], 'xoi', 'xoi')(
-    x=1, o=2**19-1)
+    x=1)
 
 motor_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
     'OutboundMotorProtocol',
-    [('x', 1), ('_', 19), ('c', 1), ('i', 7), ('f', 1), ('p', 1), ('q', 1),
-     ('d', 1)], 'x_i', 'x_i')(x=1, _=2**19-1, f=0)
+    [('x', 1), ('o', 19), ('c', 1), ('i', 7), ('f', 1), ('p', 1), ('q', 1),
+     ('d', 1)], 'xoi', 'xoi')(x=1, f=0)
 
 pwm_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
     'OutboundPwmProtocol', [('x', 1), ('o', 19), ('c', 1), ('i', 7),
                             ('f', 1), ('p', 2), ('d', 1)],
-    'xoi', 'xoi')(x=1, o=2**19-1, f=0)
+    'xoi', 'xoi')(x=1, f=0)
 
 # o for object (0xFEFFF8), i for ID (of UART), s for sensor, d for
 # dimension
@@ -36,74 +36,134 @@ edge_dirs = {'EAST': 0, 'E': 0,
              'SOUTH': 5, 'S': 5}
 
 
-def sensor_transform(sensor_type, pushbot_to_filter_keyspace,
-                     filter_out_transform=1.,
-                     mc_to_pushbot_start_keyspaces_payloads=list(),
-                     mc_to_pushbot_stop_keyspaces_payloads=list(),
-                     filter_args=dict()):
-    """Create a new function to transform sensors and their outgoing
-    connections into filter vertices and associated connections.
+class RobotConnectivityTransform(object):
+    def __init__(self, obj_type, keyspace, filter_out_transform=1.,
+                 mc_to_pushbot_start_keyspaces_payloads=list(),
+                 mc_to_pushbot_stop_keyspaces_payloads=list(),
+                 filter_args=dict()):
+        """Create a new function to transform actuators and their incoming
+        connections into filter vertices and associated connections.
 
-    :param sensor_type: Class of sensor to modify
-    :param pushbot_to_filter_keyspace: The keyspace with which to expect
-                                       packets from the pushbot vertex.
-    :param filter_out_modifier: Function to modify functions from the filter
-                                vertex.
-    """
-    def prepare_sensor(objs, conns, probes):
-        """Replace sensor objects with connections from the pushbot vertex and
-        ensure that the sensor feedback is enabled.
+        :param actuator_type: Class of actuator to modify
+        :param pushbot_to_filter_keyspace: The keyspace with which to expect
+                                           packets from the pushbot vertex.
+        :param filter_out_modifier: Function to modify functions from the
+                                    filter vertex.
+        """
+        self.obj_type = obj_type
+        self.keyspace = keyspace
+        self.filter_out_transform = filter_out_transform
+        self.mc_to_pushbot_start = mc_to_pushbot_start_keyspaces_payloads
+        self.mc_to_pushbot_stop = mc_to_pushbot_stop_keyspaces_payloads
+        self.filter_args = filter_args
+
+    def _get_pushbot_vertex_connection(self, fv, pbv):
+        raise NotImplementedError
+
+    def _connection_swap_predicate(self, c, obj):
+        raise NotImplementedError
+
+    def _connection_swap(self, c, fv):
+        raise NotImplementedError
+
+    def __call__(self, objs, conns, probes):
+        """Replace actuator objects with connections from the pushbot vertex
+        and ensure that the sensor feedback is enabled.
         """
         # Create a list of objects and connections which are nothing to do with
-        # accelerometers
-        new_objs = [o for o in objs if not isinstance(o, sensor_type)]
+        # the actuator.
+        new_objs = [o for o in objs if not isinstance(o, self.obj_type)]
         new_conns = [c for c in conns if
-                     not isinstance(c.pre_obj, sensor_type) and
-                     not isinstance(c.post_obj, sensor_type)]
+                     not isinstance(c.pre_obj, self.obj_type) and
+                     not isinstance(c.post_obj, self.obj_type)]
 
-        # Replace all accelerometer objects with the pushbot vertex, modify all
-        # connections from the accelerometer.
-        sensors = [o for o in objs if isinstance(o, sensor_type)]
-        for obj in sensors:
+        pushbot_vertex = mc_vertex = None
+
+        # Replace all actuator objects with the pushbot vertex, modify all
+        # connections from the actuator.
+        actuators = [o for o in objs if isinstance(o, self.obj_type)]
+        for obj in actuators:
             # Get the pushbot vertex and multicast vertex
             pushbot_vertex, mc_vertex, os, cs = get_vertex(obj.bot)
             new_objs.extend(os)
             new_conns.extend(cs)
 
             # Create a new filter vertex, with incoming connection from the
-            # pushbot vertex
-            fv = node.IntermediateFilter(**filter_args)
+            # pushbot vertex.
+            fv = node.IntermediateFilter(**self.filter_args)
             new_objs.append(fv)
-            new_conns.append(connection.IntermediateConnection(
-                pushbot_vertex, fv, keyspace=pushbot_to_filter_keyspace))
+            fvc = self._get_pushbot_vertex_connection(fv, pushbot_vertex)
+            if fvc.pre_obj is fv:
+                fvc.transform = np.eye(fv.size_in) * self.filter_out_transform
+            new_conns.append(fvc)
 
-            # Modify all the connections from the accelerometer to have
-            # them start at the filter vertex.
-            in_conns = [c for c in conns if c.pre_obj is obj]
+            # Modify all the connections to the actuator to have them terminate
+            # at the filter vertex.
+            in_conns = [c for c in conns if
+                        self._connection_swap_predicate(c, obj)]
             for c in in_conns:
                 c = connection.IntermediateConnection.from_connection(c)
-                c.pre_obj = fv
-                c.transform = np.dot(filter_out_transform, c.transform)
+                c = self._connection_swap(c, fv)
+                if c.pre_obj is fv:
+                    c.transform = np.dot(self.filter_out_transform,
+                                         c.transform)
                 new_conns.append(c)
 
+        if pushbot_vertex is not None and mc_vertex is not None:
             # Add new packets to the pushbot vertex to ensure that
             # sensor data is switched on and off.
-            for (ks, payload) in mc_to_pushbot_start_keyspaces_payloads:
+            for (ks, payload) in self.mc_to_pushbot_start:
                 pushbot_vertex.start_packets.append(
-                    MulticastPacket(0, ks.key(), payload))
-                new_conns.append(connection.IntermediateConnection(
-                    mc_vertex, pushbot_vertex, keyspace=ks))
+                    MulticastPacket(0, ks, payload))
 
-            for (ks, payload) in mc_to_pushbot_stop_keyspaces_payloads:
+            for (ks, payload) in self.mc_to_pushbot_stop:
                 pushbot_vertex.end_packets.append(
-                    MulticastPacket(0, ks.key(), payload))
+                    MulticastPacket(0, ks, payload))
+
+            # Add connections between the multicast vertex and the pushbot
+            # vertex, but only one edge per key.
+            # *** YUCK *** - Allow comparisons of keyspaces with ==
+            new_ks = list()
+            new_keys = list(c.keyspace.key() for c in new_conns if c.pre_obj ==
+                            mc_vertex)
+            for (ks, _) in (self.mc_to_pushbot_start +
+                            self.mc_to_pushbot_stop):
+                if ks.key() not in new_keys:
+                    new_ks.append(ks)
+                    new_keys.append(ks.key())
+
+            for ks in new_ks:
                 new_conns.append(connection.IntermediateConnection(
                     mc_vertex, pushbot_vertex, keyspace=ks))
 
         # Return the new objects and new connections list
         return new_objs, new_conns
 
-    return prepare_sensor
+
+class SensorTransform(RobotConnectivityTransform):
+    def _get_pushbot_vertex_connection(self, fv, pbv):
+        return connection.IntermediateConnection(
+            pbv, fv, is_accumulatory=False, keyspace=self.keyspace)
+
+    def _connection_swap_predicate(self, c, obj):
+        return c.pre_obj is obj
+
+    def _connection_swap(self, c, fv):
+        c.pre_obj = fv
+        return c
+
+
+class ActuatorTransform(RobotConnectivityTransform):
+    def _get_pushbot_vertex_connection(self, fv, pbv):
+        return connection.IntermediateConnection(fv, pbv,
+                                                 keyspace=self.keyspace)
+
+    def _connection_swap_predicate(self, c, obj):
+        return c.post_obj is obj
+
+    def _connection_swap(self, c, fv):
+        c.post_obj = fv
+        return c
 
 
 def get_vertex(bot):
@@ -173,10 +233,10 @@ class PushBotVertex(pacman103.front.common.ExternalDeviceVertex):
             connected_node_edge=connected_node_edge
         )
         self.start_packets = [nengo_spinnaker.assembler.MulticastPacket(
-            0, generic_robot_keyspace(i=0, f=0, d=7).key(), 0)
+            0, generic_robot_keyspace(i=0, f=0, d=7), 0)
         ]
         self.end_packets = [nengo_spinnaker.assembler.MulticastPacket(
-            0, generic_robot_keyspace(i=1, f=0, d=0).key(), 0)
+            0, generic_robot_keyspace(i=1, f=0, d=0), 0)
         ]
         self.index = index
 
