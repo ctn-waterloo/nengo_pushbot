@@ -19,6 +19,7 @@ setup(
     author="CNRGlab at UWaterloo and APT at University of Manchester",
     author_email="https://github.com/ctn-waterloo/nengo_pushbot/issues",
     packages=['nengo_pushbot'],
+    package_data={'nengo_pushbot': ['binaries/*.aplx']},
     scripts=[],
     license="GPLv3",
     description=description,
