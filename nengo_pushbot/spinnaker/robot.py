@@ -40,7 +40,8 @@ class RobotConnectivityTransform(object):
     def __init__(self, obj_type, keyspace, filter_out_transform=1.,
                  mc_to_pushbot_start_keyspaces_payloads=list(),
                  mc_to_pushbot_stop_keyspaces_payloads=list(),
-                 filter_args=dict()):
+                 filter_args=dict(),
+                 filter_vertex_type=node.IntermediateFilter):
         """Create a new function to transform actuators and their incoming
         connections into filter vertices and associated connections.
 
@@ -56,6 +57,7 @@ class RobotConnectivityTransform(object):
         self.mc_to_pushbot_start = mc_to_pushbot_start_keyspaces_payloads
         self.mc_to_pushbot_stop = mc_to_pushbot_stop_keyspaces_payloads
         self.filter_args = filter_args
+        self.filter_type = filter_vertex_type
 
     def _get_pushbot_vertex_connection(self, fv, pbv):
         raise NotImplementedError
@@ -90,7 +92,7 @@ class RobotConnectivityTransform(object):
 
             # Create a new filter vertex, with incoming connection from the
             # pushbot vertex.
-            fv = node.IntermediateFilter(**self.filter_args)
+            fv = self.filter_type(**self.filter_args)
             new_objs.append(fv)
             fvc = self._get_pushbot_vertex_connection(fv, pushbot_vertex)
             if fvc.pre_obj is fv:
