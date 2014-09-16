@@ -27,6 +27,11 @@ inbound_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
     'InboundRobotKeyspace', [('o', 21), ('i', 4), ('s', 5), ('d', 2)],
     'ois', 'ois')(o=0xFEFFF8 >> 3)
 
+# Retina keyspace (standardised on ...p6x6y)
+retina_keyspace = nengo_spinnaker.utils.keyspaces.create_keyspace(
+    'InboundRetinaKeyspace', [('o', 19), ('p', 1), ('x', 6), ('y', 6)],
+    'o', 'o')
+
 # Directions mapped to link indices
 edge_dirs = {'EAST': 0, 'E': 0,
              'NORTH EAST': 1, 'NE': 1, 'NORTHEAST': 1, 'NORTH-EAST': 1,
@@ -41,6 +46,7 @@ class RobotConnectivityTransform(object):
                  mc_to_pushbot_start_keyspaces_payloads=list(),
                  mc_to_pushbot_stop_keyspaces_payloads=list(),
                  filter_args=dict(),
+                 filter_args_maker=lambda obj: dict(),
                  filter_vertex_type=node.IntermediateFilter):
         """Create a new function to transform actuators and their incoming
         connections into filter vertices and associated connections.
@@ -57,6 +63,7 @@ class RobotConnectivityTransform(object):
         self.mc_to_pushbot_start = mc_to_pushbot_start_keyspaces_payloads
         self.mc_to_pushbot_stop = mc_to_pushbot_stop_keyspaces_payloads
         self.filter_args = filter_args
+        self.filter_args_maker = filter_args_maker
         self.filter_type = filter_vertex_type
 
     def _get_pushbot_vertex_connection(self, fv, pbv):
@@ -67,6 +74,9 @@ class RobotConnectivityTransform(object):
 
     def _connection_swap(self, c, fv):
         raise NotImplementedError
+
+    def _get_filter_args(self, obj):
+        return self.filter_args.copy().update(self.filter_args_maker(obj))
 
     def __call__(self, objs, conns, probes):
         """Replace actuator objects with connections from the pushbot vertex
@@ -92,7 +102,8 @@ class RobotConnectivityTransform(object):
 
             # Create a new filter vertex, with incoming connection from the
             # pushbot vertex.
-            fv = self.filter_type(**self.filter_args)
+            filter_args = self._get_filter_args(obj)
+            fv = self.filter_type(**filter_args)
             new_objs.append(fv)
             fvc = self._get_pushbot_vertex_connection(fv, pushbot_vertex)
             if fvc.pre_obj is fv:
