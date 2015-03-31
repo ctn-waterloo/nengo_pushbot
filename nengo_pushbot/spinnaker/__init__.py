@@ -2,7 +2,7 @@ try:
     from nengo_spinnaker.builder import Builder
 
     from . import robot
-    from .countspikes import CountSpikesVertex
+    #from .countspikes import CountSpikesVertex
     from .. import accel, beep, compass, countspikes, gyro, motor
 
     # Create a connectivity transform to convert connections from
@@ -29,6 +29,7 @@ try:
 
     # Create a connectivity transform to convert connections from the compass
     # into connections via a compass vertex
+    '''
     from .compass import CompassVertex
     Builder.register_connectivity_transform(robot.SensorTransform(
         compass.Compass,
@@ -38,7 +39,7 @@ try:
         [(robot.generic_robot_keyspace(i=1, f=1, d=0), 0)],              # off
         filter_vertex_type=CompassVertex
     ))
-
+    '''
     # Create a connectivity transform to convert connections to the beeper into
     # connections via a filter vertex.
     Builder.register_connectivity_transform(robot.ActuatorTransform(
@@ -64,6 +65,7 @@ try:
 
     # Create a connectivity transform to convert connections from retina spike
     # counters into connections from the robot via the appropriate vertex type.
+    '''
     Builder.register_connectivity_transform(robot.SensorTransform(
         countspikes.CountSpikes,
         robot.retina_keyspace(o=0xFEFEF8 >> 3),  # Retina uses different keys
@@ -74,5 +76,6 @@ try:
         filter_args_maker=lambda obj: {'region': obj.region},
         filter_vertex_type=CountSpikesVertex
     ))
+    '''
 except ImportError:
     pass

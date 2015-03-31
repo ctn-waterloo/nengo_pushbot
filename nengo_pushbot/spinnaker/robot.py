@@ -76,7 +76,9 @@ class RobotConnectivityTransform(object):
         raise NotImplementedError
 
     def _get_filter_args(self, obj):
-        return self.filter_args.copy().update(self.filter_args_maker(obj))
+        x = self.filter_args.copy()
+        x.update(self.filter_args_maker(obj))
+        return x
 
     def __call__(self, objs, conns, probes):
         """Replace actuator objects with connections from the pushbot vertex
@@ -127,11 +129,11 @@ class RobotConnectivityTransform(object):
             # sensor data is switched on and off.
             for (ks, payload) in self.mc_to_pushbot_start:
                 pushbot_vertex.start_packets.append(
-                    MulticastPacket(0, ks, payload))
+                    MulticastPacket(0, ks.key(), payload))
 
             for (ks, payload) in self.mc_to_pushbot_stop:
                 pushbot_vertex.end_packets.append(
-                    MulticastPacket(0, ks, payload))
+                    MulticastPacket(0, ks.key(), payload))
 
             # Add connections between the multicast vertex and the pushbot
             # vertex, but only one edge per key.
@@ -246,10 +248,10 @@ class PushBotVertex(pacman103.front.common.ExternalDeviceVertex):
             connected_node_edge=connected_node_edge
         )
         self.start_packets = [nengo_spinnaker.assembler.MulticastPacket(
-            0, generic_robot_keyspace(i=0, f=0, d=7), 0)
+            0, generic_robot_keyspace(i=0, f=0, d=7).key(), 0)
         ]
         self.end_packets = [nengo_spinnaker.assembler.MulticastPacket(
-            0, generic_robot_keyspace(i=1, f=0, d=0), 0)
+            0, generic_robot_keyspace(i=1, f=0, d=0).key(), 0)
         ]
         self.index = index
 
