@@ -3,6 +3,7 @@ try:
 
     from . import robot
     #from .countspikes import CountSpikesVertex
+    import compass as spinn_compass
     from .. import accel, beep, compass, countspikes, gyro, motor
 
     # Create a connectivity transform to convert connections from
@@ -29,17 +30,14 @@ try:
 
     # Create a connectivity transform to convert connections from the compass
     # into connections via a compass vertex
-    '''
-    from .compass import CompassVertex
     Builder.register_connectivity_transform(robot.SensorTransform(
         compass.Compass,
         robot.inbound_keyspace(i=1, s=9),
         1.0,
         [(robot.generic_robot_keyspace(i=1, f=1, d=2), 9 << 27 | 100)],  # on
         [(robot.generic_robot_keyspace(i=1, f=1, d=0), 0)],              # off
-        filter_vertex_type=CompassVertex
+        filter_vertex_type=spinn_compass.CompassVertex
     ))
-    '''
     # Create a connectivity transform to convert connections to the beeper into
     # connections via a filter vertex.
     Builder.register_connectivity_transform(robot.ActuatorTransform(
@@ -60,7 +58,7 @@ try:
         100.0 / 2.0**15,  # Convert to +/- 100.0
         [(robot.motor_keyspace(i=2, p=0, q=0, d=0), 1)],  # Turn on the motors
         [(robot.motor_keyspace(i=2, p=0, q=0, d=0), 0)],  # Turn off the motors
-        {'size_in': 2, 'transmission_period': 100}  # Arguments for the filter
+        {'size_in': 2, 'transmission_period': 25}  # Arguments for the filter
     ))
 
     # Create a connectivity transform to convert connections from retina spike
