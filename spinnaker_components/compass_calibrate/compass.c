@@ -106,6 +106,13 @@ void c_main(void) {
   if (!get_data(addr)) {
     return;
   }
+  
+  // Initialize compass max and min
+  for(int i = 0; i < 3; i++)
+  {
+    compass_max[i] = kbits(INT32_MIN);
+    compass_min[i] = kbits(INT32_MAX);
+  }
 
   // Set up the callbacks
   spin1_set_timer_tick(1000);
